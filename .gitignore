@@ -1,0 +1,4 @@
+# Spark
+backend/.venv/
+__pycache__/
+*.pyc
