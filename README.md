@@ -7,9 +7,11 @@
 | 功能 | 说明 |
 |------|------|
 | 💬 **智能问答** | 三模式：RAG 文档问答 / 剪贴板上下文 / 直接问答，带对话历史持久化 |
-| 📖 **内置阅读器** | 打开 .txt .md .pdf .docx，AI 自动分析段落概念并出示历史背景 |
-| 📚 **文档库** | 拖拽导入文档，自动分块嵌入向量库，支持全文检索增强问答 |
+| 📖 **内置阅读器** | PDF 图片渲染（QGraphicsView，高 DPI 2x），支持缩放、翻页、拖拽平移、目录导航 |
+| | .txt .md .docx 等格式自动切换渲染方式，三栏布局（目录 \| 内容 \| AI 分析） |
+| 📚 **文档库** | 拖拽导入文档，自动分块嵌入向量库，分批处理大文件不崩溃，支持全程进度显示 |
 | ⚙️ **设置面板** | 模型切换、剪贴板监控、全局快捷键、开机自启 |
+| 🎨 **革命红主题** | 深色近黑背景 + #c0392b 红色点缀，几何锐利风格，贴合应用定位 |
 
 **理论立场：** 分析始终基于马列毛主义理论框架和历史唯物主义视角，提供具体的历史背景和时代条件分析。
 
@@ -81,14 +83,16 @@ spark/
 │   ├── app.py           # 入口 + 系统托盘 + 全局快捷键
 │   ├── main_window.py   # 四标签主窗口
 │   ├── chat_tab.py      # 问答对话面板
-│   ├── reader_tab.py    # 阅读器 + AI 段落分析
+│   ├── reader_tab.py    # 三栏阅读器（目录 | 内容 | AI 分析）
+│   ├── pdf_renderer.py  # PDF 图片渲染 + QGraphicsView 缩放平移
+│   ├── toc_panel.py     # 目录侧栏（PDF 书签树 + 文本标题提取）
 │   ├── library_tab.py   # 文档库 + 向量库管理
 │   ├── settings_tab.py  # 设置面板
 │   ├── conversation_db.py # 对话历史 SQLite
 │   ├── ai_worker.py     # 后台 AI 线程（不卡 UI）
 │   ├── file_parser.py   # .pdf/.docx/.txt 文本提取
 │   └── resources/
-│       └── theme.qss    # 深色阅读主题
+│       └── theme.qss    # 革命红深色主题
 ├── backend/              # 核心引擎（CLI 版代码未改动）
 │   ├── config.py        # 模型配置 + Prompt 模板
 │   ├── ollama_client.py # Ollama HTTP API
