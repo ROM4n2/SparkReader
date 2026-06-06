@@ -56,23 +56,24 @@ class ReaderTab(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # ── Top toolbar ──
+        # ── Top toolbar — three groups ──
         toolbar = QHBoxLayout()
         toolbar.setContentsMargins(12, 8, 12, 8)
 
+        # Left: file operations
         self.open_btn = QPushButton("📂 打开文件")
         self.open_btn.clicked.connect(self._open_file)
         toolbar.addWidget(self.open_btn)
 
-        self.file_label = QLabel("")
-        self.file_label.setStyleSheet("color: #888; font-size: 13px;")
-        toolbar.addWidget(self.file_label)
+        self.clear_btn = QPushButton("✕ 关闭")
+        self.clear_btn.setStyleSheet("background: #555; padding: 6px 16px; font-size: 12px;")
+        self.clear_btn.clicked.connect(self._close_file)
+        self.clear_btn.hide()
+        toolbar.addWidget(self.clear_btn)
 
-        self.toolbar_zoom_label = QLabel("")
-        self.toolbar_zoom_label.setStyleSheet("color: #888; font-size: 13px;")
-        self.toolbar_zoom_label.hide()
-        toolbar.addWidget(self.toolbar_zoom_label)
+        toolbar.addStretch(1)
 
+        # Center: reading controls
         self.toc_toggle_btn = QPushButton("目录")
         self.toc_toggle_btn.setFixedSize(60, 28)
         self.toc_toggle_btn.setStyleSheet(
@@ -82,13 +83,17 @@ class ReaderTab(QWidget):
         self.toc_toggle_btn.clicked.connect(self._toggle_toc)
         toolbar.addWidget(self.toc_toggle_btn)
 
-        toolbar.addStretch()
+        self.toolbar_zoom_label = QLabel("")
+        self.toolbar_zoom_label.setStyleSheet("color: #888; font-size: 13px; margin-left: 8px;")
+        self.toolbar_zoom_label.hide()
+        toolbar.addWidget(self.toolbar_zoom_label)
 
-        self.clear_btn = QPushButton("✕ 关闭")
-        self.clear_btn.setStyleSheet("background: #555; padding: 6px 16px; font-size: 12px;")
-        self.clear_btn.clicked.connect(self._close_file)
-        self.clear_btn.hide()
-        toolbar.addWidget(self.clear_btn)
+        toolbar.addStretch(1)
+
+        # Right: current file name
+        self.file_label = QLabel("")
+        self.file_label.setStyleSheet("color: #888; font-size: 13px;")
+        toolbar.addWidget(self.file_label)
 
         layout.addLayout(toolbar)
 
