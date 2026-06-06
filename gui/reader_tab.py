@@ -42,6 +42,8 @@ class ReaderTab(QWidget):
         self.current_page = 0
         self.total_pages = 0
         self.current_zoom = 1.0
+        self._toc_visible = True
+        self._toc_sizes: list[int] | None = None
         self._detect_timer = QTimer()
         self._detect_timer.setSingleShot(True)
         self._detect_timer.setInterval(800)  # debounce 800ms
@@ -70,6 +72,12 @@ class ReaderTab(QWidget):
         self.toolbar_zoom_label.setStyleSheet("color: #888; font-size: 13px;")
         self.toolbar_zoom_label.hide()
         toolbar.addWidget(self.toolbar_zoom_label)
+
+        self.toc_toggle_btn = QPushButton("📖")
+        self.toc_toggle_btn.setFixedSize(32, 28)
+        self.toc_toggle_btn.setToolTip("切换目录栏")
+        self.toc_toggle_btn.clicked.connect(self._toggle_toc)
+        toolbar.addWidget(self.toc_toggle_btn)
 
         toolbar.addStretch()
 
@@ -160,6 +168,21 @@ class ReaderTab(QWidget):
         layout.addWidget(self.status_bar)
 
     # ── Page navigation helpers (filled by PdfRenderer in Task 2) ──
+
+    def _toggle_toc(self):
+        """Show/hide the TOC sidebar."""
+        splitter = self.findChild(QSplitter)
+        if self._toc_visible:
+            # Save current sizes before hiding
+            self._toc_sizes = splitter.sizes()
+            self.toc_panel.hide()
+            self._toc_visible = False
+        else:
+            self.toc_panel.show()
+            self._toc_visible = True
+            # Restore previous sizes after the splitter has re-laid-out
+            if self._toc_sizes:
+                QTimer.singleShot(0, lambda: splitter.setSizes(self._toc_sizes))
 
     def _toggle_page_nav(self, visible: bool):
         """Show/hide PDF page navigation controls."""
