@@ -13,7 +13,7 @@ from PySide6.QtCore import Qt, QTimer, QThread
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QPlainTextEdit, QTextBrowser, QSplitter, QLabel,
-    QFileDialog, QMessageBox, QListWidget, QListWidgetItem,
+    QFileDialog, QMessageBox,
 )
 from pathlib import Path
 
@@ -37,6 +37,9 @@ class ReaderTab(QWidget):
     def __init__(self):
         super().__init__()
         self.current_file: str | None = None
+        self.current_page = 0
+        self.total_pages = 0
+        self.current_zoom = 1.0
         self._detect_timer = QTimer()
         self._detect_timer.setSingleShot(True)
         self._detect_timer.setInterval(800)  # debounce 800ms
@@ -60,6 +63,12 @@ class ReaderTab(QWidget):
         self.file_label = QLabel("")
         self.file_label.setStyleSheet("color: #888; font-size: 13px;")
         toolbar.addWidget(self.file_label)
+
+        self.toolbar_zoom_label = QLabel("")
+        self.toolbar_zoom_label.setStyleSheet("color: #888; font-size: 13px;")
+        self.toolbar_zoom_label.hide()
+        toolbar.addWidget(self.toolbar_zoom_label)
+
         toolbar.addStretch()
 
         self.clear_btn = QPushButton("✕ 关闭")
@@ -70,10 +79,28 @@ class ReaderTab(QWidget):
 
         layout.addLayout(toolbar)
 
-        # ── Main splitter: reader + explanation ──
+        # ── Three-column splitter: TOC | content | explain ──
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        # Left: text reader
+        # Left: TOC placeholder (replaced by TocPanel in Task 3)
+        self.toc_widget = QWidget()
+        toc_layout = QVBoxLayout(self.toc_widget)
+        toc_layout.setContentsMargins(0, 0, 0, 0)
+        toc_header = QLabel("📖 目录")
+        toc_header.setStyleSheet(
+            "font-weight: 600; padding: 12px; font-size: 14px;"
+            " border-bottom: 1px solid #2a2a3e;"
+        )
+        toc_layout.addWidget(toc_header)
+        self.toc_placeholder = QLabel("(打开文件后显示目录)")
+        self.toc_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.toc_placeholder.setStyleSheet("color: #555; padding: 12px;")
+        toc_layout.addWidget(self.toc_placeholder)
+        self.toc_widget.setMinimumWidth(180)
+        self.toc_widget.setMaximumWidth(300)
+        splitter.addWidget(self.toc_widget)
+
+        # Center: content area (QPlainTextEdit for txt, replaced by PdfRenderer for PDF)
         self.reader = QPlainTextEdit()
         self.reader.setReadOnly(True)
         self.reader.setStyleSheet(
@@ -85,10 +112,6 @@ class ReaderTab(QWidget):
             "}"
         )
         self.reader.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
-        # Add paragraph spacing by inserting extra blank line between paragraphs
-        self.reader.document().setDefaultStyleSheet(
-            "p { margin-bottom: 12px; }"
-        )
         self.reader.cursorPositionChanged.connect(self._on_cursor_moved)
         splitter.addWidget(self.reader)
 
@@ -111,17 +134,56 @@ class ReaderTab(QWidget):
         right_layout.addWidget(self.explain_browser, 1)
 
         splitter.addWidget(right_panel)
-        splitter.setSizes([500, 300])
-
+        splitter.setSizes([200, 500, 300])
         layout.addWidget(splitter, 1)
 
-        # ── Status bar ──
+        # ── Bottom status bar with page navigation (hidden until PDF opens) ──
+        status_layout = QHBoxLayout()
+        status_layout.setContentsMargins(12, 4, 12, 4)
+
         self.status_label = QLabel("📖 点击「打开文件」开始阅读")
-        self.status_label.setStyleSheet(
-            "color: #666; font-size: 12px; padding: 4px 12px;"
-            " border-top: 1px solid #2a2a3e;"
-        )
-        layout.addWidget(self.status_label)
+        self.status_label.setStyleSheet("color: #666; font-size: 12px;")
+        status_layout.addWidget(self.status_label)
+        status_layout.addStretch()
+
+        self.page_label = QLabel("")
+        self.page_label.setStyleSheet("color: #888; font-size: 12px; margin: 0 8px;")
+        status_layout.addWidget(self.page_label)
+
+        self.prev_btn = QPushButton("◀")
+        self.prev_btn.setFixedSize(28, 24)
+        self.prev_btn.setEnabled(False)
+        self.prev_btn.clicked.connect(lambda: self._prev_page())
+        status_layout.addWidget(self.prev_btn)
+
+        self.next_btn = QPushButton("▶")
+        self.next_btn.setFixedSize(28, 24)
+        self.next_btn.setEnabled(False)
+        self.next_btn.clicked.connect(lambda: self._next_page())
+        status_layout.addWidget(self.next_btn)
+
+        self.status_bar = QWidget()
+        self.status_bar.setLayout(status_layout)
+        self.status_bar.setStyleSheet("border-top: 1px solid #2a2a3e;")
+        self.status_bar.hide()
+        layout.addWidget(self.status_bar)
+
+    # ── Page navigation helpers (filled by PdfRenderer in Task 2) ──
+
+    def _toggle_page_nav(self, visible: bool):
+        """Show/hide PDF page navigation controls."""
+        self.status_bar.setVisible(visible)
+        self.toolbar_zoom_label.setVisible(visible)
+        self.prev_btn.setEnabled(visible and self.current_page > 0)
+        self.next_btn.setEnabled(visible and self.current_page < self.total_pages - 1)
+
+    def _prev_page(self):
+        if hasattr(self, 'pdf_renderer'):
+            self.pdf_renderer.prev_page()
+
+    def _next_page(self):
+        if hasattr(self, 'pdf_renderer'):
+            self.pdf_renderer.next_page()
 
     # ── File management ──
 
@@ -134,30 +196,49 @@ class ReaderTab(QWidget):
         )
         if not file_path:
             return
-
+        ext = Path(file_path).suffix.lower()
         try:
-            content = parse_file(file_path)
-            # Normalize paragraph spacing: ensure double newline between paragraphs
-            import re
-            content = re.sub(r"\n{3,}", "\n\n", content)  # collapse excessive gaps
-            content = re.sub(r"([^\n])\n([^\n])", r"\1\n\n\2", content)  # single newline → paragraph break
-            self.reader.setPlainText(content)
-            self.current_file = file_path
-            name = Path(file_path).name
-            self.file_label.setText(f"📄 {name}")
-            self.clear_btn.show()
-            self.status_label.setText(f"📖 正在阅读: {name}")
-            self.explain_browser.clear()
+            if ext == ".pdf":
+                self._open_pdf(file_path)
+            else:
+                self._open_text(file_path)
         except Exception as e:
             QMessageBox.warning(self, "打开失败", f"无法读取文件:\n{e}")
 
+    def _open_text(self, file_path: str):
+        """Open a .txt/.md/.docx file in QPlainTextEdit."""
+        content = parse_file(file_path)
+        import re
+        content = re.sub(r"\n{3,}", "\n\n", content)
+        content = re.sub(r"([^\n])\n([^\n])", r"\1\n\n\2", content)
+        self.reader.setPlainText(content)
+        self.current_file = file_path
+        name = Path(file_path).name
+        self.file_label.setText(f"📄 {name}")
+        self.clear_btn.show()
+        self.status_label.setText(f"📖 正在阅读: {name}")
+        self.explain_browser.clear()
+        self._toggle_page_nav(False)
+        self.reader.show()
+
+    def _open_pdf(self, file_path: str):
+        """Open a PDF file (stub — replaced with PdfRenderer in Task 2)."""
+        QMessageBox.information(self, "提示", "PDF 阅读器正在开发中，暂时以文本模式打开。")
+        self._open_text(file_path)
+
     def _close_file(self):
         self.reader.clear()
+        self.reader.show()
+        if hasattr(self, 'pdf_renderer'):
+            self.pdf_renderer.close_document()
+            self.pdf_renderer.deleteLater()
+            del self.pdf_renderer
         self.current_file = None
         self.file_label.setText("")
         self.clear_btn.hide()
         self.explain_browser.clear()
         self.status_label.setText("📖 点击「打开文件」开始阅读")
+        self._toggle_page_nav(False)
 
     # ── Cursor tracking ──
 
