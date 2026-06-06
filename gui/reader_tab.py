@@ -21,9 +21,9 @@ from backend.ollama_client import OllamaClient
 
 
 PARAGRAPH_DETECT_PROMPT = (
-    "以下是用户正在阅读的一段文本。请判断这段文字是否在讨论某个核心概念或重要观点。\n"
-    "如果是，请用中文简要解释这个概念（50-100字），并指出这段文字的核心要点。\n"
-    "如果只是过渡段落、叙述性文字或无需解释的简单内容，请只回复「无需解释」。\n\n"
+    "你是一个马列经典著作阅读助手。用户正在阅读一段文本，请做两件事：\n"
+    "1. 指出这段文本在讨论什么核心概念或话题\n"
+    "2. 用1-3句话简要解释这个概念\n\n"
     "文本：\n{text}"
 )
 
@@ -154,17 +154,37 @@ class ReaderTab(QWidget):
             self._detect_timer.start()  # restart timer
 
     def _get_current_paragraph(self) -> str:
-        """Extract the paragraph around the cursor."""
+        """Extract the full paragraph around the cursor (between blank lines)."""
+        doc = self.reader.document()
         cursor = self.reader.textCursor()
-        # Select the current paragraph (between blank lines)
-        cursor.movePosition(cursor.MoveOperation.StartOfBlock)
-        cursor.movePosition(cursor.MoveOperation.EndOfBlock, cursor.MoveMode.KeepAnchor)
-        text = cursor.selectedText().strip()
-        if not text:
-            # Try to select surrounding text within a reasonable range
-            cursor.select(cursor.SelectionType.BlockUnderCursor)
-            text = cursor.selectedText().strip()
-        return text
+        current_block = cursor.block()
+
+        # Find paragraph start (previous blank line or document start)
+        start_block = current_block
+        while start_block.blockNumber() > 0:
+            prev = start_block.previous()
+            if prev.text().strip() == "":
+                break
+            start_block = prev
+
+        # Find paragraph end (next blank line or document end)
+        end_block = current_block
+        while end_block.blockNumber() < doc.blockCount() - 1:
+            nxt = end_block.next()
+            if nxt.text().strip() == "":
+                break
+            end_block = nxt
+
+        # Collect text from start_block to end_block
+        lines = []
+        block = start_block
+        while True:
+            lines.append(block.text())
+            if block.blockNumber() == end_block.blockNumber():
+                break
+            block = block.next()
+
+        return "\n".join(lines).strip()
 
     def _detect_concept(self):
         """Send current paragraph to AI for concept detection."""
@@ -173,28 +193,29 @@ class ReaderTab(QWidget):
             self.status_label.setText("📖 已就绪")
             return
 
-        prompt = PARAGRAPH_DETECT_PROMPT.format(text=text[:800])  # limit length
+        # Limit text length to avoid timeout on huge paragraphs
+        text = text[:1200]
+        prompt = PARAGRAPH_DETECT_PROMPT.format(text=text)
 
         try:
             response = self.client.chat(prompt)
-            response = response.strip()
+            response = response.strip() or "(无响应)"
 
-            if "无需解释" in response:
-                self.explain_browser.clear()
-                self.explain_browser.setPlaceholderText("当前段落无需专门解释。")
-                self.status_label.setText("📖 已就绪")
-            else:
-                # Highlight the current paragraph in the reader
-                self._highlight_paragraph()
-                self.explain_browser.setHtml(
-                    f'<div style="color: #c4956a; font-size: 13px; line-height: 1.6;">'
-                    f'{response}</div>'
-                )
-                self.status_label.setText("✅ 概念已识别")
-        except Exception:
+            # Highlight the current paragraph in the reader
+            self._highlight_paragraph()
+            # Render with basic HTML formatting
+            html_text = response.replace("\n", "<br>")
+            self.explain_browser.setHtml(
+                f'<div style="color: #f0e6d3; font-size: 14px; line-height: 1.7;">'
+                f'{html_text}</div>'
+            )
+            self.status_label.setText("✅ 分析完成")
+        except Exception as e:
             self.status_label.setText("⚠️ 分析失败")
-            self.explain_browser.clear()
-            self.explain_browser.setPlaceholderText("分析失败，请稍后重试。")
+            self.explain_browser.setHtml(
+                f'<div style="color: #c4956a; font-size: 13px;">'
+                f'分析失败: {str(e)[:100]}</div>'
+            )
 
     def _highlight_paragraph(self):
         """Visually mark the current paragraph with a temporary selection."""
