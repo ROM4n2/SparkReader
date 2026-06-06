@@ -147,9 +147,13 @@ class ReaderTab(QWidget):
 
     def _on_cursor_moved(self):
         """Called when the cursor position changes. Debounce the AI call."""
-        if self.current_file:
+        if not self.current_file:
+            return
+        if self._thread and self._thread.isRunning():
+            self.status_label.setText("⏳ 等待上一条分析完成...")
+        else:
             self.status_label.setText("🧠 正在分析...")
-            self._detect_timer.start()  # restart timer
+        self._detect_timer.start()  # restart timer
 
     def _get_current_paragraph(self) -> str:
         """Extract the full paragraph around the cursor (between blank lines)."""
