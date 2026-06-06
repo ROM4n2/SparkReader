@@ -9,9 +9,9 @@ _PROJ_ROOT = os.path.abspath(os.path.join(_RDR_DIR, ".."))
 sys.path.insert(0, _PROJ_ROOT)
 sys.path.insert(0, os.path.join(_PROJ_ROOT, "backend"))
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import Qt, Signal, QEvent
 from PySide6.QtGui import QPixmap, QImage
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QScrollArea
 import fitz  # PyMuPDF
 
 
@@ -36,15 +36,36 @@ class PdfRenderer(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        self.scroll_area = QScrollArea()
+        self.scroll_area.setWidgetResizable(False)
+        self.scroll_area.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.scroll_area.setStyleSheet(
+            "QScrollArea { background: #181825; border: none; }"
+        )
+        layout.addWidget(self.scroll_area)
 
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.image_label.setStyleSheet("background: #181825; padding: 8px;")
-        layout.addWidget(self.image_label)
+        self.scroll_area.setWidget(self.image_label)
+
+        # Intercept scroll area viewport wheel events → route to our handler
+        self.scroll_area.viewport().installEventFilter(self)
 
         self.setMinimumSize(300, 200)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+    def eventFilter(self, obj, event):
+        """Intercept scroll area viewport events → route to our handlers."""
+        if obj == self.scroll_area.viewport():
+            if event.type() == QEvent.Type.Wheel:
+                self.wheelEvent(event)
+                return True
+            if event.type() == QEvent.Type.MouseButtonPress:
+                self.mousePressEvent(event)
+                return True
+        return super().eventFilter(obj, event)
 
     def load_document(self, doc: fitz.Document):
         """Load a fitz Document and render page 0."""
@@ -54,29 +75,19 @@ class PdfRenderer(QWidget):
         self._render_current()
 
     def _render_current(self):
-        """Render the current page at current zoom."""
+        """Render the current page at current zoom and display at full size."""
         if self.doc is None:
             return
         page = self.doc[self._page_num]
-        zoom = self._zoom
-        matrix = fitz.Matrix(zoom, zoom)
+        matrix = fitz.Matrix(self._zoom, self._zoom)
         pix = page.get_pixmap(matrix=matrix)
         img = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format.Format_RGB888)
         self._pixmap = QPixmap.fromImage(img)
-        # Scale to fit width while maintaining aspect ratio
-        label_w = self.image_label.width() - 16
-        if label_w > 0 and self._pixmap.width() > label_w:
-            scaled = self._pixmap.scaledToWidth(
-                label_w,
-                Qt.TransformationMode.SmoothTransformation,
-            )
-        else:
-            scaled = self._pixmap
-        self.image_label.setPixmap(scaled)
+        self.image_label.setPixmap(self._pixmap)
         self.zoom_changed.emit(self._zoom)
 
     def resizeEvent(self, event):
-        """Re-render when widget is resized (e.g. splitter dragged)."""
+        """Re-render when widget is resized."""
         super().resizeEvent(event)
         if self.doc:
             self._render_current()
