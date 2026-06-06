@@ -309,10 +309,11 @@ class ChatTab(QWidget):
         self._worker = AiWorker(prompt)
         self._worker.moveToThread(self._thread)
         self._thread.started.connect(self._worker.run)
-        self._worker.finished.connect(self._on_chat_done)
-        self._worker.error.connect(self._on_chat_error)
+        # quit() before handler (signal order matters)
         self._worker.finished.connect(self._thread.quit)
         self._worker.error.connect(self._thread.quit)
+        self._worker.finished.connect(self._on_chat_done)
+        self._worker.error.connect(self._on_chat_error)
         self._thread.start()
 
     def _on_chat_done(self, response: str):
