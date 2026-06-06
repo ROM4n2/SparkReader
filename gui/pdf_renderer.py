@@ -10,7 +10,7 @@ sys.path.insert(0, _PROJ_ROOT)
 sys.path.insert(0, os.path.join(_PROJ_ROOT, "backend"))
 
 from PySide6.QtCore import Qt, Signal, QTimer, QRectF
-from PySide6.QtGui import QPixmap, QImage
+from PySide6.QtGui import QPixmap, QImage, QPainter
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QGraphicsView, QGraphicsScene
 import fitz
 
@@ -43,14 +43,9 @@ class PdfRenderer(QWidget):
         self.view.setStyleSheet(
             "QGraphicsView { background: #181825; border: none; }"
         )
-        self.view.setRenderHints(
-            self.view.renderHints() |
-            self.view.transform().Type.SmoothTransformation
-        )
-        self.view.setDragMode(QGraphicsView.DragMode.ScrollHandDrag)
-        self.view.setTransformationAnchor(
-            QGraphicsView.ViewportAnchor.AnchorUnderMouse
-        )
+        self.view.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        self.view.setDragMode(QGraphicsView.ScrollHandDrag)
+        self.view.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
         layout.addWidget(self.view)
 
     # ── Document lifecycle ──
