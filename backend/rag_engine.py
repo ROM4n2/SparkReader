@@ -103,13 +103,17 @@ class RAGEngine:
 
     # ── Ingestion ──────────────────────────────────────────────────
 
-    def ingest_text(self, text: str, source: str = "") -> int:
+    BATCH_SIZE = 50  # Chunks per batch to avoid OOM and ChromaDB overload
+
+    def ingest_text(self, text: str, source: str = "",
+                    progress_callback=None) -> int:
         """
-        Split text into chunks and store in ChromaDB.
+        Split text into chunks and store in ChromaDB in batches.
 
         Args:
             text: The full text content.
             source: Source name / file path for reference.
+            progress_callback: Optional callable(msg: str) for progress updates.
 
         Returns:
             Number of chunks ingested.
@@ -118,30 +122,49 @@ class RAGEngine:
         if not chunks:
             return 0
 
-        ids = [c["id"] for c in chunks]
-        texts = [c["text"] for c in chunks]
-        metadatas = [
-            {"source": c["source"], "chunk_index": c["chunk_index"]}
-            for c in chunks
-        ]
+        total = len(chunks)
+        ingested = 0
 
-        # Generate embeddings via Ollama
-        embeddings = [self.ollama.embed(t) for t in texts]
+        # Process in batches: embed → add → free memory
+        for batch_start in range(0, total, self.BATCH_SIZE):
+            batch = chunks[batch_start:batch_start + self.BATCH_SIZE]
 
-        self.collection.add(
-            ids=ids,
-            documents=texts,
-            metadatas=metadatas,
-            embeddings=embeddings,
-        )
-        return len(chunks)
+            ids = [c["id"] for c in batch]
+            texts = [c["text"] for c in batch]
+            metadatas = [
+                {"source": c["source"], "chunk_index": c["chunk_index"]}
+                for c in batch
+            ]
 
-    def ingest_file(self, file_path: str) -> int:
+            # Generate embeddings for this batch
+            if progress_callback:
+                msg = f"正在嵌入 ({batch_start + 1}-{min(batch_start + self.BATCH_SIZE, total)}/{total})..."
+                progress_callback(msg)
+            embeddings = [self.ollama.embed(t) for t in texts]
+
+            # Write this batch to ChromaDB
+            self.collection.add(
+                ids=ids,
+                documents=texts,
+                metadatas=metadatas,
+                embeddings=embeddings,
+            )
+            ingested += len(batch)
+
+            # Allow memory to be freed before next batch
+            del ids, texts, metadatas, embeddings, batch
+
+        if progress_callback:
+            progress_callback(f"完成，共 {ingested} 个片段")
+        return ingested
+
+    def ingest_file(self, file_path: str, progress_callback=None) -> int:
         """
         Load a text/markdown file and ingest it.
 
         Args:
             file_path: Path to .txt or .md file.
+            progress_callback: Optional callable(msg: str) for progress updates.
 
         Returns:
             Number of chunks ingested.
@@ -158,14 +181,15 @@ class RAGEngine:
         else:
             text = path.read_text(encoding="utf-8", errors="replace")
         source = path.name
-        return self.ingest_text(text, source=source)
+        return self.ingest_text(text, source=source, progress_callback=progress_callback)
 
-    def ingest_directory(self, dir_path: str) -> int:
+    def ingest_directory(self, dir_path: str, progress_callback=None) -> int:
         """
         Ingest all .txt, .md, .pdf, .docx files in a directory.
 
         Args:
             dir_path: Directory to scan.
+            progress_callback: Optional callable(msg: str) for progress updates.
 
         Returns:
             Total chunks ingested.
@@ -175,11 +199,17 @@ class RAGEngine:
             raise FileNotFoundError(f"目录不存在: {dir_path}")
 
         total = 0
+        files = []
         for ext in ("*.txt", "*.md", "*.pdf", "*.docx"):
-            for fpath in sorted(base.glob(ext)):
-                count = self.ingest_file(str(fpath))
-                print(f"  [FILE] {fpath.name}: {count} chunks")
-                total += count
+            files.extend(sorted(base.glob(ext)))
+
+        for i, fpath in enumerate(files):
+            if progress_callback:
+                progress_callback(f"({i + 1}/{len(files)}) {fpath.name}...")
+            count = self.ingest_file(str(fpath), progress_callback=progress_callback)
+            total += count
+        if progress_callback:
+            progress_callback(f"目录扫描完成，共 {total} 个片段")
         return total
 
     # ── Retrieval ──────────────────────────────────────────────────

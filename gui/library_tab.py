@@ -199,6 +199,7 @@ class LibraryTab(QWidget):
         self._thread.started.connect(self._worker.run)
         self._worker.finished.connect(self._on_file_done)
         self._worker.error.connect(self._on_file_error)
+        self._worker.progress.connect(self.progress_label.setText)
         self._worker.finished.connect(self._thread.quit)
         self._worker.error.connect(self._thread.quit)
         self._thread.start()

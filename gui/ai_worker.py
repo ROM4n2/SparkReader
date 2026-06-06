@@ -49,7 +49,7 @@ class IngestWorker(QObject):
         try:
             self.progress.emit(f"正在解析: {name}")
             engine = RAGEngine()
-            count = engine.ingest_file(self.file_path)
+            count = engine.ingest_file(self.file_path, progress_callback=self.progress.emit)
             engine.close()
             self.finished.emit(name, count)
         except Exception as e:
@@ -72,7 +72,7 @@ class DirIngestWorker(QObject):
         try:
             self.progress.emit("正在扫描目录...")
             engine = RAGEngine()
-            total = engine.ingest_directory(self.dir_path)
+            total = engine.ingest_directory(self.dir_path, progress_callback=self.progress.emit)
             engine.close()
             self.finished.emit(total)
         except Exception as e:
