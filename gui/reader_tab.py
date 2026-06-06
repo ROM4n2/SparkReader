@@ -20,6 +20,7 @@ from pathlib import Path
 from gui.ai_worker import AiWorker
 from gui.file_parser import parse_file
 from gui.pdf_renderer import PdfRenderer
+from gui.toc_panel import TocPanel
 
 
 PARAGRAPH_DETECT_PROMPT = (
@@ -83,23 +84,12 @@ class ReaderTab(QWidget):
         # ── Three-column splitter: TOC | content | explain ──
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
-        # Left: TOC placeholder (replaced by TocPanel in Task 3)
-        self.toc_widget = QWidget()
-        toc_layout = QVBoxLayout(self.toc_widget)
-        toc_layout.setContentsMargins(0, 0, 0, 0)
-        toc_header = QLabel("📖 目录")
-        toc_header.setStyleSheet(
-            "font-weight: 600; padding: 12px; font-size: 14px;"
-            " border-bottom: 1px solid #2a2a3e;"
-        )
-        toc_layout.addWidget(toc_header)
-        self.toc_placeholder = QLabel("(打开文件后显示目录)")
-        self.toc_placeholder.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.toc_placeholder.setStyleSheet("color: #555; padding: 12px;")
-        toc_layout.addWidget(self.toc_placeholder)
-        self.toc_widget.setMinimumWidth(180)
-        self.toc_widget.setMaximumWidth(300)
-        splitter.addWidget(self.toc_widget)
+        # Left: TOC panel
+        self.toc_panel = TocPanel()
+        self.toc_panel.setMinimumWidth(180)
+        self.toc_panel.setMaximumWidth(300)
+        self.toc_panel.navigate_requested.connect(self._on_toc_navigate)
+        splitter.addWidget(self.toc_panel)
 
         # Center: content area (QPlainTextEdit for txt, replaced by PdfRenderer for PDF)
         self.reader = QPlainTextEdit()
@@ -221,6 +211,9 @@ class ReaderTab(QWidget):
         self.explain_browser.clear()
         self._toggle_page_nav(False)
         self.reader.show()
+        # Set text TOC from headings
+        lines = content.split("\n")
+        self.toc_panel.set_text_toc(lines)
 
     def _open_pdf(self, file_path: str):
         """Open a PDF file for image-based rendering."""
@@ -228,6 +221,10 @@ class ReaderTab(QWidget):
         doc = fitz.open(file_path)
         name = Path(file_path).name
         self.current_file = file_path
+
+        # Set TOC
+        toc = doc.get_toc()
+        self.toc_panel.set_pdf_toc(toc or [])
 
         # Replace center widget with PdfRenderer
         splitter = self.findChild(QSplitter)
@@ -252,6 +249,11 @@ class ReaderTab(QWidget):
         self.explain_browser.clear()
         self._update_page_label()
         self.pdf_renderer.setFocus()
+
+    def _on_toc_navigate(self, page: int):
+        """Jump to PDF page from TOC click (TOC is 1-indexed, PdfRenderer 0-indexed)."""
+        if hasattr(self, 'pdf_renderer') and self.pdf_renderer.doc:
+            self.pdf_renderer.goto_page(page - 1)
 
     def _on_pdf_page_changed(self, page_num: int):
         self.current_page = page_num
@@ -299,6 +301,7 @@ class ReaderTab(QWidget):
         self.current_file = None
         self.file_label.setText("")
         self.clear_btn.hide()
+        self.toc_panel.clear()
         self.explain_browser.clear()
         self.status_label.setText("📖 点击「打开文件」开始阅读")
         self._toggle_page_nav(False)
