@@ -1,6 +1,7 @@
 """
 Library tab — document management for the vector database.
 Drag-drop import, file list with chunk counts, delete and re-index.
+All ingestion runs in background threads to prevent UI freezing.
 """
 import sys
 import os
@@ -10,16 +11,17 @@ sys.path.insert(0, _PROJ_ROOT)
 sys.path.insert(0, os.path.join(_PROJ_ROOT, "backend"))
 
 from pathlib import Path
-from PySide6.QtCore import Qt, QTimer, QThread
+from PySide6.QtCore import Qt, QThread
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLabel,
     QListWidget, QListWidgetItem, QFileDialog, QMessageBox,
-    QProgressBar, QSplitter, QFrame,
+    QProgressBar,
 )
 from PySide6.QtGui import QDragEnterEvent, QDropEvent
 
 from backend.rag_engine import RAGEngine
 from backend.config import DOCUMENTS_DIR
+from gui.ai_worker import IngestWorker, DirIngestWorker
 
 
 class LibraryTab(QWidget):
@@ -28,6 +30,7 @@ class LibraryTab(QWidget):
     def __init__(self):
         super().__init__()
         self.engine = RAGEngine()
+        self._thread: QThread | None = None
         self._build_ui()
         self._refresh()
 
@@ -50,7 +53,6 @@ class LibraryTab(QWidget):
         header.addStretch()
 
         self.scan_btn = QPushButton("📁 扫描文件夹")
-        self.scan_btn.setStyleSheet("background: #555; padding: 6px 16px; font-size: 12px;")
         self.scan_btn.clicked.connect(self._scan_directory)
         header.addWidget(self.scan_btn)
 
@@ -62,39 +64,43 @@ class LibraryTab(QWidget):
 
         # ── Drop zone hint ──
         self.drop_hint = QLabel(
-            "📥 拖拽 .txt / .md 文件到此处导入到向量库"
+            "📥 拖拽文件到此处导入到向量库（支持 .txt .md .pdf .docx）"
         )
         self.drop_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.drop_hint.setStyleSheet(
-            "border: 2px dashed #2a2a3e; border-radius: 8px;"
-            " padding: 20px; color: #666; font-size: 14px;"
+            "border: 2px dashed #333642; border-radius: 8px;"
+            " padding: 20px; color: #555870; font-size: 14px;"
         )
         layout.addWidget(self.drop_hint)
 
-        # ── Progress bar (hidden by default) ──
+        # ── Progress ──
         self.progress = QProgressBar()
-        self.progress.setRange(0, 0)  # indeterminate
+        self.progress.setRange(0, 0)
         self.progress.hide()
         layout.addWidget(self.progress)
+
+        self.progress_label = QLabel("")
+        self.progress_label.setStyleSheet("color: #989aab; font-size: 12px;")
+        self.progress_label.hide()
+        layout.addWidget(self.progress_label)
 
         # ── Document list ──
         self.doc_list = QListWidget()
         self.doc_list.setStyleSheet(
-            "QListWidget { background: #13131f; border: 1px solid #2a2a3e;"
+            "QListWidget { background: #14151c; border: 1px solid #252730;"
             " border-radius: 6px; padding: 8px; }"
-            "QListWidget::item { padding: 10px 12px; border-bottom: 1px solid #2a2a3e; }"
+            "QListWidget::item { padding: 10px 12px; border-bottom: 1px solid #1e202a; }"
         )
         layout.addWidget(self.doc_list, 1)
 
         # ── Bottom bar ──
         bottom = QHBoxLayout()
         self.count_label = QLabel("")
-        self.count_label.setStyleSheet("color: #888; font-size: 12px;")
+        self.count_label.setStyleSheet("color: #555870; font-size: 12px;")
         bottom.addWidget(self.count_label)
         bottom.addStretch()
 
         self.reindex_btn = QPushButton("🔄 全部重新嵌入")
-        self.reindex_btn.setStyleSheet("background: #555; padding: 6px 16px; font-size: 12px;")
         self.reindex_btn.clicked.connect(self._reindex_all)
         bottom.addWidget(self.reindex_btn)
 
@@ -107,6 +113,23 @@ class LibraryTab(QWidget):
 
         layout.addLayout(bottom)
 
+    # ── Busy state management ──
+
+    def _set_busy(self, busy: bool):
+        """Enable/disable controls during background work."""
+        self.add_btn.setEnabled(not busy)
+        self.scan_btn.setEnabled(not busy)
+        self.reindex_btn.setEnabled(not busy)
+        self.clear_btn.setEnabled(not busy)
+        self.setAcceptDrops(not busy)
+        if busy:
+            self.progress.show()
+            self.progress_label.show()
+        else:
+            self.progress.hide()
+            self.progress_label.hide()
+            self._thread = None
+
     # ── Drag & Drop ──
 
     def dragEnterEvent(self, event: QDragEnterEvent):
@@ -114,12 +137,14 @@ class LibraryTab(QWidget):
             event.acceptProposedAction()
 
     def dropEvent(self, event: QDropEvent):
+        files = []
         for url in event.mimeData().urls():
             path = url.toLocalFile()
             ext = Path(path).suffix.lower()
             if ext in (".txt", ".md", ".pdf", ".docx"):
-                self._ingest_file(path)
-        self._refresh()
+                files.append(path)
+        if files:
+            self._ingest_files(files)
 
     # ── Actions ──
 
@@ -128,11 +153,8 @@ class LibraryTab(QWidget):
             self, "选择文件", "",
             "支持的文件 (*.txt *.md *.pdf *.docx);;所有文件 (*.*)",
         )
-        if not files:
-            return
-        for f in files:
-            self._ingest_file(f)
-        self._refresh()
+        if files:
+            self._ingest_files(files)
 
     def _scan_directory(self):
         dir_path = QFileDialog.getExistingDirectory(
@@ -140,26 +162,66 @@ class LibraryTab(QWidget):
         )
         if not dir_path:
             return
-        self.progress.show()
-        self.progress.setRange(0, 0)
-        try:
-            count = self.engine.ingest_directory(dir_path)
-            QMessageBox.information(self, "扫描完成", f"已导入 {count} 个片段")
-        except Exception as e:
-            QMessageBox.warning(self, "扫描失败", str(e))
-        finally:
-            self.progress.hide()
-        self._refresh()
+        self._set_busy(True)
+        self.progress_label.setText("正在扫描目录...")
 
-    def _ingest_file(self, path: str):
-        self.progress.show()
-        self.progress.setRange(0, 0)
-        try:
-            self.engine.ingest_file(path)
-        except Exception as e:
-            QMessageBox.warning(self, "导入失败", f"{Path(path).name}: {e}")
-        finally:
-            self.progress.hide()
+        self._thread = QThread()
+        self._worker = DirIngestWorker(dir_path)
+        self._worker.moveToThread(self._thread)
+        self._thread.started.connect(self._worker.run)
+        self._worker.progress.connect(self.progress_label.setText)
+        self._worker.finished.connect(self._on_dir_done)
+        self._worker.error.connect(self._on_dir_error)
+        self._worker.finished.connect(self._thread.quit)
+        self._worker.error.connect(self._thread.quit)
+        self._thread.start()
+
+    def _ingest_files(self, paths: list[str]):
+        """Queue one file at a time for ingestion."""
+        self._file_queue = list(paths)
+        self._set_busy(True)
+        self._ingest_next()
+
+    def _ingest_next(self):
+        """Ingest the next file in the queue."""
+        if not self._file_queue:
+            self._set_busy(False)
+            self._refresh()
+            return
+
+        file_path = self._file_queue.pop(0)
+        name = Path(file_path).name
+        self.progress_label.setText(f"正在处理 ({len(self._file_queue) + 1} 个剩余): {name}")
+
+        self._thread = QThread()
+        self._worker = IngestWorker(file_path)
+        self._worker.moveToThread(self._thread)
+        self._thread.started.connect(self._worker.run)
+        self._worker.finished.connect(self._on_file_done)
+        self._worker.error.connect(self._on_file_error)
+        self._worker.finished.connect(self._thread.quit)
+        self._worker.error.connect(self._thread.quit)
+        self._thread.start()
+
+    def _on_file_done(self, filename: str, chunk_count: int):
+        """Single file ingested successfully."""
+        self._ingest_next()  # process next file in queue
+
+    def _on_file_error(self, filename: str, error_msg: str):
+        """Single file ingestion failed."""
+        QMessageBox.warning(self, "导入失败", f"{filename}: {error_msg}")
+        self._ingest_next()  # continue with next file
+
+    def _on_dir_done(self, total: int):
+        """Directory scan complete."""
+        self._set_busy(False)
+        self._refresh()
+        QMessageBox.information(self, "扫描完成", f"已导入 {total} 个片段")
+
+    def _on_dir_error(self, error_msg: str):
+        """Directory scan failed."""
+        self._set_busy(False)
+        QMessageBox.warning(self, "扫描失败", error_msg)
 
     def _reindex_all(self):
         reply = QMessageBox.question(
@@ -170,25 +232,40 @@ class LibraryTab(QWidget):
         if reply == QMessageBox.StandardButton.No:
             return
 
-        self.progress.show()
-        self.progress.setRange(0, 0)
-        try:
-            # Clear and re-ingest
-            count = self.engine.collection.count()
-            if count > 0:
-                self.engine.collection.delete(
-                    ids=self.engine.collection.get()["ids"]
-                )
-            total = self.engine.ingest_directory(str(DOCUMENTS_DIR))
-            QMessageBox.information(
-                self, "重新嵌入完成",
-                f"已清除旧嵌入，重新导入 {total} 个片段。"
-            )
-        except Exception as e:
-            QMessageBox.warning(self, "重新嵌入失败", str(e))
-        finally:
-            self.progress.hide()
-        self._refresh()
+        self._set_busy(True)
+        self.progress_label.setText("正在清空向量库...")
+
+        # Clear in background too
+        self._reindex_thread = QThread()
+        self._reindex_worker = DirIngestWorker(str(DOCUMENTS_DIR))
+
+        # Override behavior: clear first, then scan
+        original_run = self._reindex_worker.run
+
+        def reindex_run():
+            try:
+                self.progress.emit("正在清空旧嵌入...")
+                engine = RAGEngine()
+                count = engine.collection.count()
+                if count > 0:
+                    engine.collection.delete(ids=engine.collection.get()["ids"])
+                engine.close()
+                self.progress.emit("正在重新导入...")
+                engine2 = RAGEngine()
+                total = engine2.ingest_directory(str(DOCUMENTS_DIR))
+                engine2.close()
+                self.finished.emit(total)
+            except Exception as e:
+                self.error.emit(str(e))
+
+        self._reindex_worker.run = reindex_run
+        self._reindex_worker.moveToThread(self._reindex_thread)
+        self._reindex_thread.started.connect(self._reindex_worker.run)
+        self._reindex_worker.finished.connect(self._on_dir_done)
+        self._reindex_worker.error.connect(self._on_dir_error)
+        self._reindex_worker.finished.connect(self._reindex_thread.quit)
+        self._reindex_worker.error.connect(self._reindex_thread.quit)
+        self._reindex_thread.start()
 
     def _clear_all(self):
         reply = QMessageBox.question(
@@ -221,7 +298,6 @@ class LibraryTab(QWidget):
                 self.status_label.setText("空")
                 return
 
-            # Group by source file
             results = self.engine.collection.get(include=["metadatas"])
             sources: dict[str, int] = {}
             for m in results["metadatas"]:
