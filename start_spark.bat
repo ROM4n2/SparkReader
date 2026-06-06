@@ -4,6 +4,7 @@ REM 用法: start_spark          (双模式)
 REM       start_spark --chat   (问答模式)
 REM       start_spark --rag    (RAG 文档问答模式)
 REM       start_spark --ingest (导入文档到向量库)
+REM       start_spark --gui    (GUI 桌面模式)
 
 echo 🔥 正在启动 Spark 环境...
 
@@ -21,6 +22,12 @@ REM 3. 激活虚拟环境并启动 Spark
 cd /d "%~dp0backend"
 call .venv\Scripts\activate.bat
 echo.
-python main.py %*
+
+if /I "%1"=="--gui" (
+    shift
+    python gui\app.py %*
+) else (
+    python main.py %*
+)
 
 pause
