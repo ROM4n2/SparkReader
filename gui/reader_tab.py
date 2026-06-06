@@ -19,6 +19,7 @@ from pathlib import Path
 
 from gui.ai_worker import AiWorker
 from gui.file_parser import parse_file
+from gui.pdf_renderer import PdfRenderer
 
 
 PARAGRAPH_DETECT_PROMPT = (
@@ -222,9 +223,71 @@ class ReaderTab(QWidget):
         self.reader.show()
 
     def _open_pdf(self, file_path: str):
-        """Open a PDF file (stub — replaced with PdfRenderer in Task 2)."""
-        QMessageBox.information(self, "提示", "PDF 阅读器正在开发中，暂时以文本模式打开。")
-        self._open_text(file_path)
+        """Open a PDF file for image-based rendering."""
+        import fitz
+        doc = fitz.open(file_path)
+        name = Path(file_path).name
+        self.current_file = file_path
+
+        # Replace center widget with PdfRenderer
+        splitter = self.findChild(QSplitter)
+        self.reader.hide()
+        self.pdf_renderer = PdfRenderer()
+        self.pdf_renderer.load_document(doc)
+        idx = splitter.indexOf(self.reader)
+        splitter.insertWidget(idx, self.pdf_renderer)
+
+        # Wire signals
+        self.pdf_renderer.page_changed.connect(self._on_pdf_page_changed)
+        self.pdf_renderer.text_selected.connect(self._on_pdf_text_selected)
+        self.pdf_renderer.zoom_changed.connect(self._on_pdf_zoom_changed)
+
+        # UI state
+        self.total_pages = doc.page_count
+        self.current_page = 0
+        self._toggle_page_nav(True)
+        self.file_label.setText(f"📄 {name}")
+        self.clear_btn.show()
+        self.status_label.setText(f"📖 正在阅读: {name}  (←/→ 翻页, Ctrl+滚轮缩放)")
+        self.explain_browser.clear()
+        self._update_page_label()
+        self.pdf_renderer.setFocus()
+
+    def _on_pdf_page_changed(self, page_num: int):
+        self.current_page = page_num
+        self._update_page_label()
+        self.prev_btn.setEnabled(page_num > 0)
+        self.next_btn.setEnabled(page_num < self.total_pages - 1)
+
+    def _on_pdf_text_selected(self, text: str):
+        """Trigger AI analysis on clicked PDF text."""
+        self._trigger_analysis(text)
+
+    def _on_pdf_zoom_changed(self, zoom: float):
+        self.current_zoom = zoom
+        self.toolbar_zoom_label.setText(f"缩放: {zoom:.0%}")
+
+    def _update_page_label(self):
+        self.page_label.setText(f"第 {self.current_page + 1}/{self.total_pages} 页")
+
+    def _trigger_analysis(self, text: str):
+        """Send text to AI analysis (shared by PDF click and text cursor)."""
+        if not text or len(text) < 10:
+            return
+        text = text[:1200]
+        prompt = PARAGRAPH_DETECT_PROMPT.format(text=text)
+        if self._thread and self._thread.isRunning():
+            return
+        self.status_label.setText("🧠 后台分析中...")
+        self._thread = QThread()
+        self._worker = AiWorker(prompt)
+        self._worker.moveToThread(self._thread)
+        self._thread.started.connect(self._worker.run)
+        self._worker.finished.connect(self._thread.quit)
+        self._worker.error.connect(self._thread.quit)
+        self._worker.finished.connect(self._on_explain_done)
+        self._worker.error.connect(self._on_explain_error)
+        self._thread.start()
 
     def _close_file(self):
         self.reader.clear()
@@ -246,6 +309,8 @@ class ReaderTab(QWidget):
         """Called when the cursor position changes. Debounce the AI call."""
         if not self.current_file:
             return
+        if hasattr(self, 'pdf_renderer'):
+            return  # PDF uses click, not cursor-based
         if self._thread and self._thread.isRunning():
             self.status_label.setText("⏳ 等待上一条分析完成...")
         else:
