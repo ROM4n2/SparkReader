@@ -73,8 +73,11 @@ class ReaderTab(QWidget):
         self.toolbar_zoom_label.hide()
         toolbar.addWidget(self.toolbar_zoom_label)
 
-        self.toc_toggle_btn = QPushButton("≡")
-        self.toc_toggle_btn.setFixedSize(32, 28)
+        self.toc_toggle_btn = QPushButton("目录")
+        self.toc_toggle_btn.setFixedSize(60, 28)
+        self.toc_toggle_btn.setStyleSheet(
+            "QPushButton { padding: 2px 6px; font-size: 12px; }"
+        )
         self.toc_toggle_btn.setToolTip("切换目录栏")
         self.toc_toggle_btn.clicked.connect(self._toggle_toc)
         toolbar.addWidget(self.toc_toggle_btn)
