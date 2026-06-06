@@ -213,6 +213,18 @@ class ChatTab(QWidget):
         if self.current_conv_id is None:
             return
         messages = db.get_messages(self.current_conv_id)
+        if not messages:
+            self.msg_browser.setHtml(
+                '<div style="color: #555870; text-align: center; '
+                'padding: 40px 20px; font-size: 14px; line-height: 2;">'
+                '💬 在下方输入问题开始对话<br><br>'
+                '三种模式：<br>'
+                '  📚 RAG 问答 — 基于导入文档回答<br>'
+                '  📋 上下文 — 基于剪贴板内容回答<br>'
+                '  💬 直接 — 直接向 AI 提问'
+                '</div>'
+            )
+            return
         for msg in messages:
             prefix = "🧑" if msg["role"] == "user" else "🤖"
             mode_tag = f" [{msg['mode']}]" if msg["mode"] != "direct" else ""

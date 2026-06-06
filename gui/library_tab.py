@@ -64,7 +64,9 @@ class LibraryTab(QWidget):
 
         # ── Drop zone hint ──
         self.drop_hint = QLabel(
-            "📥 拖拽文件到此处导入到向量库（支持 .txt .md .pdf .docx）"
+            "📥 拖拽文件到此处导入到向量库\n\n"
+            "支持格式：.txt  .md  .pdf  .docx\n"
+            "导入后可在「问答」Tab 使用 RAG 模式提问"
         )
         self.drop_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.drop_hint.setStyleSheet(
@@ -290,7 +292,7 @@ class LibraryTab(QWidget):
         try:
             count = self.engine.collection.count()
             if count == 0:
-                self.doc_list.addItem("(向量库为空)")
+                self.doc_list.clear()
                 self.count_label.setText("0 个片段")
                 self.status_label.setText("空")
                 return

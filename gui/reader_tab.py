@@ -110,6 +110,17 @@ class ReaderTab(QWidget):
         # Center: content area (QPlainTextEdit for txt, replaced by PdfRenderer for PDF)
         self.reader = QPlainTextEdit()
         self.reader.setReadOnly(True)
+        self.reader.setPlaceholderText(
+            "📂 点击上方「打开文件」开始阅读\n\n"
+            "支持格式：\n"
+            "  · PDF 文件 — 图片渲染，带目录导航\n"
+            "  · TXT / Markdown — 纯文本阅读\n"
+            "  · Word 文档 (.docx)\n\n"
+            "操作提示：\n"
+            "  · ←/→ 翻页  · Ctrl+滚轮缩放\n"
+            "  · 点击页面文字 → AI 分析概念\n"
+            "  · 拖拽可平移视图"
+        )
         self.reader.setStyleSheet(
             "QPlainTextEdit {"
             "  background: #181825; color: #e0e0e0;"
