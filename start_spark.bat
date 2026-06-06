@@ -19,15 +19,19 @@ if "%ERRORLEVEL%"=="0" (
 )
 
 REM 3. 激活虚拟环境并启动 Spark
+pushd "%~dp0"
+
+if /I "%1"=="--gui" (
+    shift
+    call backend\.venv\Scripts\activate.bat
+    python gui\app.py %*
+    popd
+    pause
+    exit /b
+)
+
 cd /d "%~dp0backend"
 call .venv\Scripts\activate.bat
 echo.
 
-if /I "%1"=="--gui" (
-    shift
-    python gui\app.py %*
-) else (
-    python main.py %*
-)
-
-pause
+python main.py %*
