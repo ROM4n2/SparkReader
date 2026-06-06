@@ -13,7 +13,27 @@ from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QIcon, QKeySequence, QShortcut
 from PySide6.QtWidgets import QApplication, QMenu, QSystemTrayIcon, QMessageBox
 
+import threading
+
 from gui.main_window import MainWindow
+from gui.chat_tab import ChatTab
+from backend.clipboard_monitor import ClipboardMonitor
+
+
+class SilentClipboardMonitor(ClipboardMonitor):
+    """ClipboardMonitor variant that updates ChatTab instead of printing."""
+    def _check_once(self):
+        try:
+            import pyperclip
+            current = pyperclip.paste()
+        except Exception:
+            return
+        if not current or not current.strip():
+            return
+        if current == self.last_text:
+            return
+        self.last_text = current
+        ChatTab.latest_clipboard = current
 
 
 def run():
@@ -45,6 +65,12 @@ def run():
             sys.exit(1)
 
     window = MainWindow()
+
+    # Background clipboard monitoring
+    clipboard_thread = threading.Thread(
+        target=SilentClipboardMonitor().start, daemon=True
+    )
+    clipboard_thread.start()
 
     # System tray
     tray = QSystemTrayIcon(QIcon(), app)
