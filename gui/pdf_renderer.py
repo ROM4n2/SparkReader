@@ -33,6 +33,7 @@ class PdfRenderer(QWidget):
         self._total_pages = 0
         self._zoom = 1.0
         self._pixmap: QPixmap | None = None
+        self._shown = False
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -74,6 +75,29 @@ class PdfRenderer(QWidget):
         self._page_num = 0
         self._render_current()
 
+    def showEvent(self, event):
+        """Auto-fit page to viewport width on first show."""
+        super().showEvent(event)
+        if self.doc is not None and not self._shown:
+            self._shown = True
+            self._fit_to_width()
+
+    def _fit_to_width(self):
+        """Calculate zoom so page width fills the viewport."""
+        vpw = self.scroll_area.viewport().width() - 32  # leave margins
+        if vpw <= 0:
+            return
+        pw = self.doc[0].rect.width  # page width in points
+        target = vpw / pw
+        # Snap to nearest ZOOM_STEP
+        self._zoom = max(self.ZOOM_MIN, min(
+            round(target / self.ZOOM_STEP) * self.ZOOM_STEP,
+            self.ZOOM_MAX,
+        ))
+        if self._zoom < 0.5:
+            self._zoom = 0.5  # safety floor
+        self._render_current()
+
     def _render_current(self):
         """Render the current page at current zoom and display at full size."""
         if self.doc is None:
@@ -85,12 +109,6 @@ class PdfRenderer(QWidget):
         self._pixmap = QPixmap.fromImage(img)
         self.image_label.setPixmap(self._pixmap)
         self.zoom_changed.emit(self._zoom)
-
-    def resizeEvent(self, event):
-        """Re-render when widget is resized."""
-        super().resizeEvent(event)
-        if self.doc:
-            self._render_current()
 
     # ── Zoom ──
 
