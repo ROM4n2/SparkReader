@@ -201,8 +201,6 @@ class ReaderTab(QWidget):
             response = self.client.chat(prompt)
             response = response.strip() or "(无响应)"
 
-            # Highlight the current paragraph in the reader
-            self._highlight_paragraph()
             # Render with basic HTML formatting
             html_text = response.replace("\n", "<br>")
             self.explain_browser.setHtml(
@@ -210,6 +208,13 @@ class ReaderTab(QWidget):
                 f'{html_text}</div>'
             )
             self.status_label.setText("✅ 分析完成")
+
+            # Highlight paragraph (best-effort, don't break if it fails)
+            try:
+                self._highlight_paragraph()
+            except Exception:
+                pass
+
         except Exception as e:
             self.status_label.setText("⚠️ 分析失败")
             self.explain_browser.setHtml(
@@ -220,10 +225,11 @@ class ReaderTab(QWidget):
     def _highlight_paragraph(self):
         """Visually mark the current paragraph with a temporary selection."""
         from PySide6.QtWidgets import QTextEdit
+        from PySide6.QtGui import QTextFormat
         cursor = self.reader.textCursor()
         selection = QTextEdit.ExtraSelection()
         selection.format.setBackground(self._parse_color("#2a1f1a"))
-        selection.format.setProperty(QTextEdit.FormatProperty.FullWidthSelection, True)
+        selection.format.setProperty(QTextFormat.FullWidthSelection, True)
         selection.cursor = cursor
         self.reader.setExtraSelections([selection])
 
