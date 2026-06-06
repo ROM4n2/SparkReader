@@ -148,13 +148,16 @@ class ReaderTab(QWidget):
         status_layout = QHBoxLayout()
         status_layout.setContentsMargins(12, 4, 12, 4)
 
+        # Left: status text / filename
         self.status_label = QLabel("📖 点击「打开文件」开始阅读")
         self.status_label.setStyleSheet("color: #666; font-size: 12px;")
         status_layout.addWidget(self.status_label)
+
         status_layout.addStretch()
 
+        # Center: page controls
         self.page_label = QLabel("")
-        self.page_label.setStyleSheet("color: #888; font-size: 12px; margin: 0 8px;")
+        self.page_label.setStyleSheet("color: #888; font-size: 12px; margin: 0 4px;")
         status_layout.addWidget(self.page_label)
 
         self.page_input = QLineEdit()
@@ -179,6 +182,11 @@ class ReaderTab(QWidget):
         self.next_btn.setEnabled(False)
         self.next_btn.clicked.connect(lambda: self._next_page())
         status_layout.addWidget(self.next_btn)
+
+        # Zoom indicator
+        self.status_zoom_label = QLabel("")
+        self.status_zoom_label.setStyleSheet("color: #888; font-size: 12px; margin-left: 8px;")
+        status_layout.addWidget(self.status_zoom_label)
 
         self.status_bar = QWidget()
         self.status_bar.setLayout(status_layout)
@@ -207,6 +215,7 @@ class ReaderTab(QWidget):
         """Show/hide PDF page navigation controls."""
         self.status_bar.setVisible(visible)
         self.toolbar_zoom_label.setVisible(visible)
+        self.status_zoom_label.setVisible(visible)
         self.prev_btn.setEnabled(visible and self.current_page > 0)
         self.next_btn.setEnabled(visible and self.current_page < self.total_pages - 1)
 
@@ -288,7 +297,7 @@ class ReaderTab(QWidget):
         self._toggle_page_nav(True)
         self.file_label.setText(f"📄 {name}")
         self.clear_btn.show()
-        self.status_label.setText(f"📖 正在阅读: {name}  (←/→ 翻页, Ctrl+滚轮缩放)")
+        self.status_label.setText(f"📄 {name}")
         self.explain_browser.clear()
         self._update_page_label()
         self.pdf_renderer.setFocus()
@@ -314,7 +323,9 @@ class ReaderTab(QWidget):
 
     def _on_pdf_zoom_changed(self, zoom: float):
         self.current_zoom = zoom
-        self.toolbar_zoom_label.setText(f"缩放: {zoom:.0%}")
+        text = f"缩放: {zoom:.0%}"
+        self.toolbar_zoom_label.setText(text)
+        self.status_zoom_label.setText(text)
 
     def _update_page_label(self):
         self.page_label.setText(f"第 {self.current_page + 1}/{self.total_pages} 页")
@@ -364,6 +375,7 @@ class ReaderTab(QWidget):
         self.file_label.setText("")
         self.clear_btn.hide()
         self.toc_panel.clear()
+        self.status_zoom_label.setText("")
         self.explain_browser.clear()
         self.status_label.setText("📖 点击「打开文件」开始阅读")
         self._toggle_page_nav(False)
