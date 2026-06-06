@@ -9,6 +9,10 @@ OLLAMA_BASE_URL = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 CHAT_MODEL = "qwen2.5:7b"           # Main model for Q&A and explanations
 EMBED_MODEL = "nomic-embed-text"    # For future RAG phase
 
+# Windows Chinese username workaround:
+# If model loading fails with garbled path error, set this env var
+# before starting Ollama: set OLLAMA_MODELS=C:\ollama_models
+
 # --- Clipboard monitoring ---
 MIN_EXPLAIN_LENGTH = 50    # Min Chinese characters to trigger auto-explain
 POLL_INTERVAL = 2.0        # Seconds between clipboard checks

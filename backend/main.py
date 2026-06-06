@@ -9,11 +9,23 @@ Spark - 马列经典著作 AI 阅读助手 (MVP)
     python main.py            # 同时启动两种模式
     python main.py --chat     # 仅交互问答模式
     python main.py --watch    # 仅剪贴板监控模式
+
+注意：
+    - Ollama 服务需先启动（系统托盘中应有 Ollama 图标）
+    - 如果用户名含中文导致模型加载失败，请设置环境变量：
+      set OLLAMA_MODELS=C:\ollama_models
+      再重启 Ollama 服务
 """
 import sys
 import threading
 import argparse
 import httpx
+
+# Fix Windows console encoding for emoji/Unicode
+if sys.platform == "win32":
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 from config import (
     SYSTEM_PROMPT, CONTEXT_QA_TEMPLATE, DIRECT_QA_TEMPLATE,
