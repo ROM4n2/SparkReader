@@ -6,6 +6,8 @@ from PySide6.QtWidgets import (
     QMainWindow, QTabWidget, QWidget, QVBoxLayout, QLabel,
 )
 
+from gui.settings_tab import SettingsTab
+
 
 class MainWindow(QMainWindow):
     """Spark main window with 4 tabs. Phase 1 delivers Chat + Settings."""
@@ -23,7 +25,7 @@ class MainWindow(QMainWindow):
 
         # Phase 1 tabs
         self.chat_tab = self._make_placeholder("💬 问答", "聊天功能即将上线")
-        self.settings_tab = self._make_placeholder("⚙️ 设置", "设置面板即将上线")
+        self.settings_tab = SettingsTab()
 
         self.tabs.addTab(self.chat_tab, "💬 问答")
         self.tabs.addTab(self._make_placeholder("📖 阅读", "阅读器将在 Phase 2 实现"), "📖 阅读")
@@ -38,3 +40,6 @@ class MainWindow(QMainWindow):
         label.setStyleSheet("color: #888888; font-size: 16px;")
         layout.addWidget(label)
         return widget
+
+    def get_settings(self) -> SettingsTab:
+        return self.settings_tab
