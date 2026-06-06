@@ -131,11 +131,11 @@ class ChatTab(QWidget):
     def _mode_style(self, active: bool) -> str:
         if active:
             return (
-                "QPushButton { background: #c4956a; color: #0f0f1a;"
-                " border: none; border-radius: 12px; padding: 4px 14px; font-size: 12px; }"
+                "QPushButton { background: #c0392b; color: #ffffff;"
+                " border: none; border-radius: 12px; padding: 4px 14px; font-size: 12px; font-weight: 700; }"
             )
         return (
-            "QPushButton { background: #333; color: #888;"
+            "QPushButton { background: rgba(42,42,56,0.5); color: #77778a;"
             " border: none; border-radius: 12px; padding: 4px 14px; font-size: 12px; }"
         )
 

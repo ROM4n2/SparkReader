@@ -49,7 +49,7 @@ class PdfRenderer(QWidget):
         self.scene = QGraphicsScene()
         self.view = QGraphicsView(self.scene)
         self.view.setStyleSheet(
-            "QGraphicsView { background: #181825; border: none; }"
+            "QGraphicsView { background: #171721; border: none; }"
         )
         self.view.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         self.view.setDragMode(QGraphicsView.ScrollHandDrag)

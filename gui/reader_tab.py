@@ -66,7 +66,7 @@ class ReaderTab(QWidget):
         toolbar.addWidget(self.open_btn)
 
         self.clear_btn = QPushButton("✕ 关闭")
-        self.clear_btn.setStyleSheet("background: #555; padding: 6px 16px; font-size: 12px;")
+        self.clear_btn.setStyleSheet("background: #3a3a4a; padding: 6px 16px; font-size: 12px;")
         self.clear_btn.clicked.connect(self._close_file)
         self.clear_btn.hide()
         toolbar.addWidget(self.clear_btn)
@@ -176,8 +176,8 @@ class ReaderTab(QWidget):
         self.page_input.setFixedWidth(60)
         self.page_input.setStyleSheet(
             "QLineEdit { padding: 2px 6px; font-size: 12px;"
-            " background: #2a2a3e; border: 1px solid #444;"
-            " border-radius: 4px; color: #cdd6f4; }"
+            " background: #1e1e2a; border: 1px solid rgba(42,42,56,0.6);"
+            " border-radius: 4px; color: #e0e0e6; }"
         )
         self.page_input.returnPressed.connect(self._jump_to_page)
         status_layout.addWidget(self.page_input)

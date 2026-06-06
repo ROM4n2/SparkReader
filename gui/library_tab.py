@@ -104,7 +104,7 @@ class LibraryTab(QWidget):
 
         self.clear_btn = QPushButton("🗑️ 清空向量库")
         self.clear_btn.setStyleSheet(
-            "background: #5a2020; padding: 6px 16px; font-size: 12px;"
+            "background: #3a1515; padding: 6px 16px; font-size: 12px;"
         )
         self.clear_btn.clicked.connect(self._clear_all)
         bottom.addWidget(self.clear_btn)
