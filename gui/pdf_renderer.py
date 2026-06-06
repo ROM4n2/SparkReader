@@ -1,6 +1,6 @@
 """
 PdfRenderer — renders PDF pages as images using PyMuPDF.
-Uses QGraphicsView for zoom/scroll.
+Uses QGraphicsView for zoom/scroll with high-DPI rendering.
 """
 import sys
 import os
@@ -9,27 +9,29 @@ _PROJ_ROOT = os.path.abspath(os.path.join(_RDR_DIR, ".."))
 sys.path.insert(0, _PROJ_ROOT)
 sys.path.insert(0, os.path.join(_PROJ_ROOT, "backend"))
 
-from PySide6.QtCore import Qt, Signal, QTimer, QRectF
+from PySide6.QtCore import Qt, Signal, QTimer, QEvent, QRectF
 from PySide6.QtGui import QPixmap, QImage, QPainter
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QGraphicsView, QGraphicsScene
 import fitz
 
 
 class PdfRenderer(QWidget):
-    """Renders PDF pages as images in a zoomable/pannable QGraphicsView."""
+    """Renders PDF pages at high DPI in a zoomable/pannable QGraphicsView."""
 
     page_changed = Signal(int)
     text_selected = Signal(str)
     zoom_changed = Signal(float)
 
-    ZOOM_STEP = 0.25
+    # Quality multiplier: render at Nx the fit-to-width zoom, then scale down
+    QUALITY = 2.0
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.doc: fitz.Document | None = None
         self._page_num = 0
         self._total_pages = 0
-        self._zoom = 1.0
+        self._render_zoom = 1.0   # DPI multiplier used when rendering
+        self._display_zoom = 1.0  # view transform scale (what user sees)
         self._pixmap: QPixmap | None = None
         self._pix_item = None
 
@@ -48,33 +50,79 @@ class PdfRenderer(QWidget):
         self.view.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
         layout.addWidget(self.view)
 
+        # Intercept clicks on viewport for text extraction
+        self.view.viewport().installEventFilter(self)
+
+    # ── Event filter for click-to-extract ──
+
+    def eventFilter(self, obj, event):
+        if obj == self.view.viewport():
+            if event.type() == QEvent.Type.MouseButtonRelease:
+                # Only trigger on short clicks (no drag)
+                if hasattr(self, '_drag_start'):
+                    moved = (event.position() - self._drag_start).manhattanLength()
+                    if moved < 10:
+                        self._extract_text(event.position())
+                del self._drag_start
+                return False  # let QGraphicsView handle it too
+            if event.type() == QEvent.Type.MouseButtonPress:
+                self._drag_start = event.position()
+                return False  # let QGraphicsView handle drag
+        return super().eventFilter(obj, event)
+
     # ── Document lifecycle ──
 
     def load_document(self, doc: fitz.Document):
         self.doc = doc
         self._total_pages = doc.page_count
         self._page_num = 0
-        self._zoom = 1.0
+        self._render_zoom = 1.0
+        self._display_zoom = 1.0
         self._render_current()
-        # Fit to width once the view is laid out
+        # Fit to width once layout is settled
         QTimer.singleShot(50, self._fit_in_view)
 
     def _fit_in_view(self):
+        """Scale view to fit page width, rendering at high DPI beforehand."""
+        if self._pix_item is None:
+            return
+        vpw = self.view.viewport().width()
+        if vpw < 50:
+            QTimer.singleShot(100, self._fit_in_view)
+            return
+
+        page_w = self._pixmap.width()  # already rendered at self._render_zoom
+        # Current view scale to fit width
+        fit_scale = vpw / page_w if page_w > 0 else 1.0
+
+        # If we rendered at low zoom (< QUALITY * fit_scale), re-render at high DPI
+        # Target: render at QUALITY * fit_scale for crisp text
+        target_render = max(self.QUALITY * fit_scale, self._render_zoom)
+        if target_render > self._render_zoom * 1.1:
+            self._render_zoom = target_render
+            self._render_current()
+
+        # Reset view transform and fit
+        self.view.resetTransform()
+        self._fit_in_view_only()
+
+    def _fit_in_view_only(self):
+        """Just fit the current pixmap in the view (no re-render)."""
         if self._pix_item is None:
             return
         self.view.fitInView(
             self._pix_item, Qt.AspectRatioMode.KeepAspectRatio
         )
-        # Store the fitted zoom as baseline
         t = self.view.transform()
-        self._zoom = t.m11()  # horizontal scale factor
-        self.zoom_changed.emit(self._zoom)
+        self._display_zoom = t.m11()
+        self.zoom_changed.emit(self._display_zoom)
 
     def _render_current(self):
+        """Render page at self._render_zoom DPI multiplier."""
         if self.doc is None:
             return
         page = self.doc[self._page_num]
-        matrix = fitz.Matrix(self._zoom, self._zoom)
+        matrix = fitz.Matrix(self._render_zoom, self._render_zoom)
         pix = page.get_pixmap(matrix=matrix)
         img = QImage(pix.samples, pix.width, pix.height, pix.stride, QImage.Format.Format_RGB888)
         self._pixmap = QPixmap.fromImage(img)
@@ -82,8 +130,6 @@ class PdfRenderer(QWidget):
         self.scene.clear()
         self._pix_item = self.scene.addPixmap(self._pixmap)
         self.scene.setSceneRect(QRectF(self._pixmap.rect()))
-
-        self.zoom_changed.emit(self._zoom)
 
     def close_document(self):
         self.doc = None
@@ -100,29 +146,27 @@ class PdfRenderer(QWidget):
         if self.doc is None:
             return
         if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
-            factor = 1.0 + self.ZOOM_STEP
-            if event.angleDelta().y() < 0:
-                factor = 1.0 / factor
-            self.view.scale(factor, factor)
-            t = self.view.transform()
-            self._zoom = t.m11()
-            self.zoom_changed.emit(self._zoom)
+            # Zoom: re-render at higher/lower DPI, then fit to view
+            factor = 1.25 if event.angleDelta().y() > 0 else 0.8
+            self._render_zoom *= factor
+            self._render_zoom = max(0.5, min(self._render_zoom, 8.0))
+            self._render_current()
+            self._fit_in_view_only()
             event.accept()
         else:
-            delta = event.angleDelta().y()
-            if delta > 0:
+            if event.angleDelta().y() > 0:
                 self.prev_page()
             else:
                 self.next_page()
             event.accept()
 
     def set_zoom(self, zoom: float):
-        self._zoom = zoom
+        self._render_zoom = max(0.5, min(zoom, 8.0))
         self._render_current()
-        self._fit_in_view()
+        self._fit_in_view_only()
 
     def get_zoom(self) -> float:
-        return self._zoom
+        return self._display_zoom
 
     # ── Page navigation ──
 
@@ -133,10 +177,8 @@ class PdfRenderer(QWidget):
         if page_num == self._page_num:
             return
         self._page_num = page_num
-        # Reset zoom for new page
-        self._zoom = 1.0
         self._render_current()
-        self._fit_in_view()
+        self._fit_in_view_only()
         self.page_changed.emit(self._page_num)
 
     def prev_page(self):
@@ -169,16 +211,15 @@ class PdfRenderer(QWidget):
 
     # ── Click-to-extract text ──
 
-    def mousePressEvent(self, event):
+    def _extract_text(self, viewport_pos):
+        """Convert viewport click to page coordinates and emit text."""
         if self.doc is None or self._pixmap is None:
             return
-        if event.button() != Qt.MouseButton.LeftButton:
-            return
 
-        # Map view click → scene coordinate
-        scene_pos = self.view.mapToScene(event.position().toPoint())
-        px = scene_pos.x() / self._zoom
-        py = scene_pos.y() / self._zoom
+        scene_pos = self.view.mapToScene(viewport_pos.toPoint())
+        # Convert scene coords → page points
+        px = scene_pos.x() / self._render_zoom
+        py = scene_pos.y() / self._render_zoom
 
         page = self.doc[self._page_num]
         clip = fitz.Rect(px - 100, py - 50, px + 100, py + 50)
