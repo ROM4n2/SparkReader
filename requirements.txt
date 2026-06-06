@@ -2,3 +2,5 @@ httpx>=0.27.0
 pyperclip>=1.8.2
 chromadb>=1.5.0
 PySide6>=6.6.0
+PyMuPDF>=1.24.0
+python-docx>=1.1.0

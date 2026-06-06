@@ -116,7 +116,8 @@ class LibraryTab(QWidget):
     def dropEvent(self, event: QDropEvent):
         for url in event.mimeData().urls():
             path = url.toLocalFile()
-            if path.endswith(".txt") or path.endswith(".md"):
+            ext = Path(path).suffix.lower()
+            if ext in (".txt", ".md", ".pdf", ".docx"):
                 self._ingest_file(path)
         self._refresh()
 
@@ -125,7 +126,7 @@ class LibraryTab(QWidget):
     def _add_file(self):
         files, _ = QFileDialog.getOpenFileNames(
             self, "选择文件", "",
-            "文本文件 (*.txt *.md);;所有文件 (*.*)",
+            "支持的文件 (*.txt *.md *.pdf *.docx);;所有文件 (*.*)",
         )
         if not files:
             return

@@ -18,6 +18,7 @@ from PySide6.QtWidgets import (
 from pathlib import Path
 
 from gui.ai_worker import AiWorker
+from gui.file_parser import parse_file
 
 
 PARAGRAPH_DETECT_PROMPT = (
@@ -117,14 +118,15 @@ class ReaderTab(QWidget):
     def _open_file(self):
         file_path, _ = QFileDialog.getOpenFileName(
             self, "打开文件", "",
-            "文本文件 (*.txt *.md);;所有文件 (*.*)",
+            "支持的文件 (*.txt *.md *.pdf *.docx);;"
+            "文本文件 (*.txt *.md);;PDF 文件 (*.pdf);;"
+            "Word 文档 (*.docx);;所有文件 (*.*)",
         )
         if not file_path:
             return
 
         try:
-            with open(file_path, encoding="utf-8") as f:
-                content = f.read()
+            content = parse_file(file_path)
             self.reader.setPlainText(content)
             self.current_file = file_path
             name = Path(file_path).name

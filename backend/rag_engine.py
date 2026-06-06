@@ -150,13 +150,19 @@ class RAGEngine:
         if not path.exists():
             raise FileNotFoundError(f"文件不存在: {file_path}")
 
-        text = path.read_text(encoding="utf-8")
+        # Use file_parser for .pdf/.docx, direct read for .txt/.md
+        suffix = path.suffix.lower()
+        if suffix in (".pdf", ".docx"):
+            from gui.file_parser import parse_file
+            text = parse_file(file_path)
+        else:
+            text = path.read_text(encoding="utf-8", errors="replace")
         source = path.name
         return self.ingest_text(text, source=source)
 
     def ingest_directory(self, dir_path: str) -> int:
         """
-        Ingest all .txt and .md files in a directory.
+        Ingest all .txt, .md, .pdf, .docx files in a directory.
 
         Args:
             dir_path: Directory to scan.
@@ -169,7 +175,7 @@ class RAGEngine:
             raise FileNotFoundError(f"目录不存在: {dir_path}")
 
         total = 0
-        for ext in ("*.txt", "*.md"):
+        for ext in ("*.txt", "*.md", "*.pdf", "*.docx"):
             for fpath in sorted(base.glob(ext)):
                 count = self.ingest_file(str(fpath))
                 print(f"  [FILE] {fpath.name}: {count} chunks")
