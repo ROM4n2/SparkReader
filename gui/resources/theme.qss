@@ -1,0 +1,117 @@
+/* Spark Dark Academic Theme */
+/* Deep navy + amber accent */
+
+QMainWindow, QWidget {
+    background-color: #0f0f1a;
+    color: #f0e6d3;
+}
+
+QTabWidget::pane {
+    border: none;
+    background-color: #0f0f1a;
+}
+
+QTabBar::tab {
+    background-color: #1a1a2e;
+    color: #888888;
+    padding: 12px 20px;
+    border: none;
+    border-right: 1px solid #2a2a3e;
+    font-size: 14px;
+}
+
+QTabBar::tab:selected {
+    background-color: #0f0f1a;
+    color: #c4956a;
+    border-left: 3px solid #c4956a;
+}
+
+QTabBar::tab:hover:!selected {
+    background-color: #2a1f1a;
+    color: #c4956a;
+}
+
+QListWidget {
+    background-color: #1a1a2e;
+    border: none;
+    border-right: 1px solid #2a2a3e;
+    outline: none;
+}
+
+QListWidget::item {
+    padding: 8px 12px;
+    border-bottom: 1px solid #2a2a3e;
+}
+
+QListWidget::item:selected {
+    background-color: #2a1f1a;
+    border-left: 3px solid #c4956a;
+}
+
+QTextBrowser {
+    background-color: #0f0f1a;
+    border: none;
+    color: #f0e6d3;
+    font-size: 14px;
+}
+
+QLineEdit {
+    background-color: #1a1a2e;
+    border: 1px solid #2a2a3e;
+    border-radius: 6px;
+    padding: 10px 14px;
+    color: #f0e6d3;
+    font-size: 14px;
+}
+
+QLineEdit:focus {
+    border: 1px solid #c4956a;
+}
+
+QPushButton {
+    background-color: #c4956a;
+    color: #0f0f1a;
+    border: none;
+    border-radius: 6px;
+    padding: 10px 20px;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+QPushButton:hover {
+    background-color: #d4a57a;
+}
+
+QPushButton:pressed {
+    background-color: #a47a50;
+}
+
+QComboBox {
+    background-color: #1a1a2e;
+    border: 1px solid #2a2a3e;
+    border-radius: 4px;
+    padding: 6px 12px;
+    color: #f0e6d3;
+}
+
+QComboBox:drop-down {
+    border: none;
+}
+
+QComboBox QAbstractItemView {
+    background-color: #1a1a2e;
+    color: #f0e6d3;
+    selection-background-color: #2a1f1a;
+}
+
+QCheckBox, QLabel {
+    color: #f0e6d3;
+}
+
+QSpinBox, QDoubleSpinBox {
+    background-color: #1a1a2e;
+    border: 1px solid #2a2a3e;
+    border-radius: 4px;
+    padding: 4px 8px;
+    color: #f0e6d3;
+}
