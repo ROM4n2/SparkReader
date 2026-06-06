@@ -1,35 +1,35 @@
 # Spark — 马列毛经典 AI 阅读助手
 
-A local desktop AI assistant for reading and analyzing Marxist-Leninist-Maoist classics. Runs entirely offline with a local LLM (Ollama + Qwen2.5 7B).
+本地离线的桌面 AI 阅读助手，专为马列毛经典著作的研读设计。完全离线运行，数据不出本机。
 
-## Features
+## 功能一览
 
-| Feature | Description |
-|---------|-------------|
-| 💬 **Q&A Chat** | Three modes: RAG (document-grounded), Clipboard Context, Direct Q&A |
-| 📖 **Reader** | Built-in text reader with AI paragraph analysis and historical background |
-| 📚 **Document Library** | Drag-drop import for .txt .md .pdf .docx, vector DB management |
-| ⚙️ **Settings** | Model selection, clipboard monitoring, hotkey config, auto-start |
+| 功能 | 说明 |
+|------|------|
+| 💬 **智能问答** | 三模式：RAG 文档问答 / 剪贴板上下文 / 直接问答，带对话历史持久化 |
+| 📖 **内置阅读器** | 打开 .txt .md .pdf .docx，AI 自动分析段落概念并出示历史背景 |
+| 📚 **文档库** | 拖拽导入文档，自动分块嵌入向量库，支持全文检索增强问答 |
+| ⚙️ **设置面板** | 模型切换、剪贴板监控、全局快捷键、开机自启 |
 
-**Theoretical stance:** All analysis is grounded in Marxist-Leninist-Maoist theory with historical-materialist context, independent of any contemporary political framework.
+**理论立场：** 分析始终基于马列毛主义理论框架和历史唯物主义视角，提供具体的历史背景和时代条件分析。
 
-## Prerequisites
+## 系统要求
 
-- **Windows 10/11** (Linux/macOS: partial support)
+- **Windows 10/11**（Linux/macOS 可运行但未充分测试）
 - **Python 3.10+**
-- **Ollama** — [Download](https://ollama.com/download)
-- **GPU recommended** — RTX 5060 tested (8GB VRAM runs 7B models comfortably)
+- **Ollama** — [下载安装](https://ollama.com/download)
+- **GPU 推荐** — RTX 5060 测试通过，8GB VRAM 可流畅运行 7B 模型
 
-## Quick Start
+## 快速开始
 
-### 1. Install Ollama & pull models
+### 1. 安装 Ollama 并拉取模型
 
 ```bash
 ollama pull qwen2.5:7b
 ollama pull nomic-embed-text
 ```
 
-### 2. Set up Python environment
+### 2. 配置 Python 环境
 
 ```bash
 cd spark
@@ -37,97 +37,95 @@ python -m venv backend/.venv
 backend\.venv\Scripts\pip install -r requirements.txt
 ```
 
-### 3. Launch
+### 3. 启动 GUI
 
 ```bash
 backend\.venv\Scripts\python gui\app.py
 ```
 
-Or double-click the `start_spark.bat --gui` from File Explorer.
+或者双击 `start_spark.bat --gui`。
 
-## Usage
+## 首次使用
 
-### First run
+1. 启动程序，自动检查 Ollama 连接状态
+2. 切换到 **📚 文档库** Tab
+3. 点击 **📄 添加文件**，选择 `documents\马克思主义哲学概要.txt`
+4. 切换到 **💬 问答** Tab，在 RAG 模式下提问
 
-1. Launch the app — it checks Ollama connectivity automatically
-2. Switch to **📚 Document Library** tab
-3. Click **📄 Add File** and select `documents/马克思主义哲学概要.txt` (or drag-drop any .txt/.md/.pdf/.docx)
-4. Switch to **💬 Q&A** tab and ask a question in RAG mode
+## 阅读模式智能分析
 
-### Reader Tab Smart Detection
+在 **📖 阅读** Tab 中打开一个文本文件。点击任意段落，AI 会自动分析该段落的核心概念，并在右侧面板展示其历史背景和理论解释。
 
-Open a text file in the **📖 Reader** tab. Click any paragraph — the AI analyzes it and shows historical context and concept explanation in the right panel.
+## 文档库使用
 
-### Document Library
+- **直接拖拽**文件到文档库窗口即可导入
+- 支持格式：`.txt` `.md` `.pdf` `.docx`
+- 导入的文档自动分块、嵌入向量，用于 RAG 检索增强问答
 
-- **Drag-drop** files directly into the library window
-- Supports: `.txt` `.md` `.pdf` `.docx`
-- All text is chunked, embedded, and stored in a local ChromaDB vector database
-
-## Project Structure
+## 项目结构
 
 ```
 spark/
-├── gui/                  # PySide6 desktop GUI
-│   ├── app.py           # Entry point + system tray + hotkey
-│   ├── main_window.py   # 4-tab window framework
-│   ├── chat_tab.py      # Q&A chat with conversation history
-│   ├── reader_tab.py    # Text reader with AI analysis
-│   ├── library_tab.py   # Document library + vector DB management
-│   ├── settings_tab.py  # Settings panel
-│   ├── conversation_db.py # SQLite chat history
-│   ├── ai_worker.py     # Background AI thread (keeps UI responsive)
-│   ├── file_parser.py   # .pdf/.docx/.txt text extraction
+├── gui/                  # PySide6 桌面 GUI
+│   ├── app.py           # 入口 + 系统托盘 + 全局快捷键
+│   ├── main_window.py   # 四标签主窗口
+│   ├── chat_tab.py      # 问答对话面板
+│   ├── reader_tab.py    # 阅读器 + AI 段落分析
+│   ├── library_tab.py   # 文档库 + 向量库管理
+│   ├── settings_tab.py  # 设置面板
+│   ├── conversation_db.py # 对话历史 SQLite
+│   ├── ai_worker.py     # 后台 AI 线程（不卡 UI）
+│   ├── file_parser.py   # .pdf/.docx/.txt 文本提取
 │   └── resources/
-│       └── theme.qss    # Dark academic stylesheet
-├── backend/              # Core AI engine (unchanged from CLI MVP)
-│   ├── config.py        # Model settings + prompts
-│   ├── ollama_client.py # Ollama HTTP API wrapper
-│   ├── clipboard_monitor.py # Clipboard polling
-│   ├── rag_engine.py    # ChromaDB RAG engine
-│   ├── ingest.py        # Document ingestion CLI
-│   └── main.py          # Original CLI entry point
-├── documents/            # Sample documents for testing
+│       └── theme.qss    # 深色阅读主题
+├── backend/              # 核心引擎（CLI 版代码未改动）
+│   ├── config.py        # 模型配置 + Prompt 模板
+│   ├── ollama_client.py # Ollama HTTP API
+│   ├── clipboard_monitor.py # 剪贴板监听
+│   ├── rag_engine.py    # ChromaDB 向量检索
+│   ├── ingest.py        # 文档导入 CLI
+│   └── main.py          # 原 CLI 入口
+├── documents/            # 示例文档
 ├── requirements.txt
-├── start_spark.bat       # CLI launcher
+├── start_spark.bat       # CLI 启动脚本
 └── README.md
 ```
 
-## Configuration
+## 配置说明
 
-Edit `backend/config.py` or use the **⚙️ Settings** tab in the GUI:
+可在 `backend/config.py` 或 GUI 的 **⚙️ 设置** Tab 中修改：
 
-| Setting | Default | Description |
-|---------|---------|-------------|
-| Chat model | `qwen2.5:7b` | LLM for Q&A and analysis |
-| Embed model | `nomic-embed-text` | Text embedding for RAG |
-| Clipboard monitoring | On | Background clipboard polling |
-| Auto-explain threshold | 50 chars | Min text length to trigger explanation |
-| Global hotkey | `Ctrl+Shift+S` | Toggle window visibility |
-| Auto-start | Off | Launch on Windows boot |
+| 配置项 | 默认值 | 说明 |
+|--------|--------|------|
+| 聊天模型 | `qwen2.5:7b` | 问答和分析用的 LLM |
+| 嵌入模型 | `nomic-embed-text` | 文本向量化模型 |
+| 剪贴板监控 | 开启 | 后台监听剪贴板变化 |
+| 自动解释阈值 | 50 字 | 超过此长度的文本自动触发解释 |
+| 全局快捷键 | `Ctrl+Shift+S` | 切换窗口显示/隐藏 |
+| 开机自启 | 关闭 | 登录时自动启动 |
 
-## FAQ
+## 常见问题
 
-**Q: Does this require internet?**
-A: No. All processing is local. No data ever leaves your machine.
+**Q: 需要联网吗？**
+A: 不需要。所有处理在本地完成，数据不离开你的电脑。
 
-**Q: Why is the AI response slow?**
-A: Qwen2.5 7B takes 2-10 seconds per response on consumer GPUs. The UI runs in background threads so it stays responsive.
+**Q: AI 回答慢怎么办？**
+A: Qwen2.5 7B 在消费级 GPU 上需要 2-10 秒生成回答。UI 使用后台线程，不会卡死。
 
-**Q: Can I use a different model?**
-A: Yes. Pull any Ollama-compatible model (`ollama pull <model>`) and select it in Settings.
+**Q: 能换其他模型吗？**
+A: 可以。`ollama pull <模型名>` 后在设置中切换即可。
 
-**Q: Why the MLM theoretical stance?**
-A: The tool is designed as a serious reading companion for Marxist-Leninist-Maoist texts. It analyzes concepts within their historical-materialist context rather than through any contemporary political lens.
+**Q: 为什么是马列毛主义立场？**
+A: 本工具定位为马列毛经典著作的严肃研读工具，分析基于历史唯物主义框架，而非当代政治话语体系。
 
-## Tech Stack
+## 技术栈
 
-- **GUI:** PySide6 (Qt for Python)
-- **LLM:** Ollama + Qwen2.5 7B
-- **Vector DB:** ChromaDB (local, persistent)
-- **Embeddings:** nomic-embed-text
-- **Documents:** PyMuPDF (PDF), python-docx (Word)
+- **GUI 框架：** PySide6 (Qt for Python)
+- **语言模型：** Ollama + Qwen2.5 7B
+- **向量数据库：** ChromaDB（本地持久化）
+- **文本嵌入：** nomic-embed-text
+- **文档解析：** PyMuPDF (PDF) + python-docx (Word)
 
-## License
+## 许可证
 
 MIT
