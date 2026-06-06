@@ -9,7 +9,7 @@ _PROJ_ROOT = os.path.abspath(os.path.join(_RDR_DIR, ".."))
 sys.path.insert(0, _PROJ_ROOT)
 sys.path.insert(0, os.path.join(_PROJ_ROOT, "backend"))
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, QThread
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QPlainTextEdit, QTextBrowser, QSplitter, QLabel,
@@ -17,7 +17,7 @@ from PySide6.QtWidgets import (
 )
 from pathlib import Path
 
-from backend.ollama_client import OllamaClient
+from gui.ai_worker import AiWorker
 
 
 PARAGRAPH_DETECT_PROMPT = (
@@ -31,16 +31,14 @@ PARAGRAPH_DETECT_PROMPT = (
 class ReaderTab(QWidget):
     """Text reader with automatic concept detection and explanation."""
 
-    RECENT_FILES_KEY = "spark_recent_files"
-
     def __init__(self):
         super().__init__()
-        self.client = OllamaClient()
         self.current_file: str | None = None
         self._detect_timer = QTimer()
         self._detect_timer.setSingleShot(True)
         self._detect_timer.setInterval(800)  # debounce 800ms
         self._detect_timer.timeout.connect(self._detect_concept)
+        self._thread: QThread | None = None
         self._build_ui()
 
     def _build_ui(self):
@@ -187,40 +185,54 @@ class ReaderTab(QWidget):
         return "\n".join(lines).strip()
 
     def _detect_concept(self):
-        """Send current paragraph to AI for concept detection."""
+        """Send current paragraph to AI for concept detection (background thread)."""
+        # Don't queue another request while one is running
+        if self._thread and self._thread.isRunning():
+            return
+
         text = self._get_current_paragraph()
         if not text or len(text) < 10:
             self.status_label.setText("📖 已就绪")
             return
 
-        # Limit text length to avoid timeout on huge paragraphs
         text = text[:1200]
         prompt = PARAGRAPH_DETECT_PROMPT.format(text=text)
 
+        self.status_label.setText("🧠 后台分析中...")
+
+        # Fire up background thread
+        self._thread = QThread()
+        self._worker = AiWorker(prompt)
+        self._worker.moveToThread(self._thread)
+        self._thread.started.connect(self._worker.run)
+        self._worker.finished.connect(self._on_explain_done)
+        self._worker.error.connect(self._on_explain_error)
+        self._worker.finished.connect(self._thread.quit)
+        self._worker.error.connect(self._thread.quit)
+        self._thread.finished.connect(self._thread.deleteLater)
+        self._thread.start()
+
+    def _on_explain_done(self, response: str):
+        """Handle successful explanation from background thread."""
+        response = response.strip() or "(无响应)"
+        html_text = response.replace("\n", "<br>")
+        self.explain_browser.setHtml(
+            f'<div style="color: #f0e6d3; font-size: 14px; line-height: 1.7;">'
+            f'{html_text}</div>'
+        )
+        self.status_label.setText("✅ 分析完成")
         try:
-            response = self.client.chat(prompt)
-            response = response.strip() or "(无响应)"
+            self._highlight_paragraph()
+        except Exception:
+            pass
 
-            # Render with basic HTML formatting
-            html_text = response.replace("\n", "<br>")
-            self.explain_browser.setHtml(
-                f'<div style="color: #f0e6d3; font-size: 14px; line-height: 1.7;">'
-                f'{html_text}</div>'
-            )
-            self.status_label.setText("✅ 分析完成")
-
-            # Highlight paragraph (best-effort, don't break if it fails)
-            try:
-                self._highlight_paragraph()
-            except Exception:
-                pass
-
-        except Exception as e:
-            self.status_label.setText("⚠️ 分析失败")
-            self.explain_browser.setHtml(
-                f'<div style="color: #c4956a; font-size: 13px;">'
-                f'分析失败: {str(e)[:100]}</div>'
-            )
+    def _on_explain_error(self, error_msg: str):
+        """Handle explanation failure from background thread."""
+        self.status_label.setText("⚠️ 分析失败")
+        self.explain_browser.setHtml(
+            f'<div style="color: #c4956a; font-size: 13px;">'
+            f'分析失败: {error_msg[:100]}</div>'
+        )
 
     def _highlight_paragraph(self):
         """Visually mark the current paragraph with a temporary selection."""
@@ -240,4 +252,7 @@ class ReaderTab(QWidget):
         return QColor(hex_color)
 
     def close_client(self):
-        self.client.close()
+        """Stop any running thread on close."""
+        if self._thread and self._thread.isRunning():
+            self._thread.quit()
+            self._thread.wait(2000)

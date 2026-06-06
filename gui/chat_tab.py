@@ -10,7 +10,7 @@ sys.path.insert(0, _PROJ_ROOT)                                    # project root
 sys.path.insert(0, os.path.join(_PROJ_ROOT, "backend"))           # backend/ for config imports
 
 from datetime import datetime
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import Qt, QTimer, QThread
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QListWidget, QListWidgetItem, QTextBrowser,
@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from gui import conversation_db as db
-from backend.ollama_client import OllamaClient
+from gui.ai_worker import AiWorker
 from backend.config import DIRECT_QA_TEMPLATE, CONTEXT_QA_TEMPLATE
 
 
@@ -45,7 +45,7 @@ class ChatTab(QWidget):
         self.settings_getter = settings_getter
         self.current_conv_id: int | None = None
         self.mode = "rag"  # default
-        self.client = OllamaClient()
+        self._thread: QThread | None = None
         self._build_ui()
         self._load_conversation_list()
 
@@ -279,6 +279,11 @@ class ChatTab(QWidget):
             self.input_edit.clear()
             return
 
+        # Don't queue another request while one is running
+        if self._thread and self._thread.isRunning():
+            QMessageBox.information(self, "提示", "正在等待上一条回答，请稍后。")
+            return
+
         # Ensure we have a conversation
         if self.current_conv_id is None:
             self.current_conv_id = db.create_conversation()
@@ -288,17 +293,45 @@ class ChatTab(QWidget):
         db.add_message(self.current_conv_id, "user", text, self.mode)
         self._load_messages()
         self.input_edit.clear()
+        self.send_btn.setEnabled(False)
+        self.send_btn.setText("思考中...")
 
-        # Get AI response
+        # Build prompt and fire background thread
         try:
             prompt = self._build_prompt(text)
-            response = self.client.chat(prompt)
-            db.add_message(self.current_conv_id, "assistant", response, self.mode)
-            db.auto_title(self.current_conv_id)
-            self._load_conversation_list()
-            self._load_messages()
         except Exception as e:
-            QMessageBox.warning(self, "错误", f"AI 回答失败:\n{e}")
+            self.send_btn.setEnabled(True)
+            self.send_btn.setText("发送")
+            QMessageBox.warning(self, "错误", f"构建问题失败:\n{e}")
+            return
+
+        self._thread = QThread()
+        self._worker = AiWorker(prompt)
+        self._worker.moveToThread(self._thread)
+        self._thread.started.connect(self._worker.run)
+        self._worker.finished.connect(self._on_chat_done)
+        self._worker.error.connect(self._on_chat_error)
+        self._worker.finished.connect(self._thread.quit)
+        self._worker.error.connect(self._thread.quit)
+        self._thread.finished.connect(self._thread.deleteLater)
+        self._thread.start()
+
+    def _on_chat_done(self, response: str):
+        """Handle successful AI response from background thread."""
+        self.send_btn.setEnabled(True)
+        self.send_btn.setText("发送")
+        if self.current_conv_id is None:
+            return
+        db.add_message(self.current_conv_id, "assistant", response.strip(), self.mode)
+        db.auto_title(self.current_conv_id)
+        self._load_conversation_list()
+        self._load_messages()
+
+    def _on_chat_error(self, error_msg: str):
+        """Handle AI response failure from background thread."""
+        self.send_btn.setEnabled(True)
+        self.send_btn.setText("发送")
+        QMessageBox.warning(self, "错误", f"AI 回答失败:\n{error_msg}")
 
     def _build_prompt(self, question: str) -> str:
         """Build prompt based on current mode. Returns a prompt string
@@ -326,4 +359,6 @@ class ChatTab(QWidget):
             return DIRECT_QA_TEMPLATE.format(question=question)
 
     def close_client(self):
-        self.client.close()
+        if self._thread and self._thread.isRunning():
+            self._thread.quit()
+            self._thread.wait(2000)
