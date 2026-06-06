@@ -219,17 +219,13 @@ class ReaderTab(QWidget):
 
     def _highlight_paragraph(self):
         """Visually mark the current paragraph with a temporary selection."""
+        from PySide6.QtWidgets import QTextEdit
         cursor = self.reader.textCursor()
-        # Briefly highlight, then move to the start
-        extra_selections = []
-        selection = self.reader.ExtraSelection()
+        selection = QTextEdit.ExtraSelection()
         selection.format.setBackground(self._parse_color("#2a1f1a"))
-        selection.format.setProperty(
-            self.reader.FormatProperty.FullWidthSelection, True
-        )
+        selection.format.setProperty(QTextEdit.FormatProperty.FullWidthSelection, True)
         selection.cursor = cursor
-        extra_selections.append(selection)
-        self.reader.setExtraSelections(extra_selections)
+        self.reader.setExtraSelections([selection])
 
     @staticmethod
     def _parse_color(hex_color: str):
