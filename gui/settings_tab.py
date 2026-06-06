@@ -2,6 +2,12 @@
 Settings tab — model selection, clipboard monitoring, hotkey config.
 Settings persisted via QSettings (Windows Registry / INI fallback).
 """
+import sys
+import os
+_SET_DIR = os.path.dirname(__file__)
+sys.path.insert(0, os.path.join(_SET_DIR, ".."))           # project root
+sys.path.insert(0, os.path.join(_SET_DIR, "..", "backend"))  # backend/ for config imports
+
 import httpx
 from pathlib import Path
 from PySide6.QtCore import Qt, QSettings

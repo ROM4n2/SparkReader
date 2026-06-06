@@ -4,7 +4,9 @@ Three modes: RAG / Clipboard Context / Direct Q&A.
 """
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+_CHAT_DIR = os.path.dirname(__file__)
+sys.path.insert(0, os.path.join(_CHAT_DIR, ".."))           # project root
+sys.path.insert(0, os.path.join(_CHAT_DIR, "..", "backend"))  # backend/ for config imports
 
 from datetime import datetime
 from PySide6.QtCore import Qt, QTimer

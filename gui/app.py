@@ -5,8 +5,10 @@ Handles QApplication, system tray, and global hotkey.
 import sys
 import os
 
-# Ensure backend is importable
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+# Ensure backend is importable (adds both project root and backend/ to path)
+_APP_DIR = os.path.dirname(__file__)
+sys.path.insert(0, os.path.join(_APP_DIR, ".."))           # project root
+sys.path.insert(0, os.path.join(_APP_DIR, "..", "backend"))  # backend/ for config imports
 
 from pathlib import Path
 from PySide6.QtCore import Qt, QTimer
