@@ -9,18 +9,18 @@ _PROJ_ROOT = os.path.abspath(os.path.join(_RDR_DIR, ".."))
 sys.path.insert(0, _PROJ_ROOT)
 sys.path.insert(0, os.path.join(_PROJ_ROOT, "backend"))
 
-from PySide6.QtCore import Qt, Signal, QEvent, QTimer
+from PySide6.QtCore import Qt, Signal, QTimer, QEvent
 from PySide6.QtGui import QPixmap, QImage
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QScrollArea
-import fitz  # PyMuPDF
+import fitz
 
 
 class PdfRenderer(QWidget):
     """Renders PDF pages as images. Handles zoom, paging, click detection."""
 
-    page_changed = Signal(int)       # emitted when page changes
-    text_selected = Signal(str)      # emitted when user clicks text area
-    zoom_changed = Signal(float)     # emitted when zoom level changes
+    page_changed = Signal(int)
+    text_selected = Signal(str)
+    zoom_changed = Signal(float)
 
     ZOOM_MIN = 0.5
     ZOOM_MAX = 3.0
@@ -31,9 +31,14 @@ class PdfRenderer(QWidget):
         self.doc: fitz.Document | None = None
         self._page_num = 0
         self._total_pages = 0
-        self._zoom = 1.0
+        self._zoom = 2.0
         self._pixmap: QPixmap | None = None
-        self._shown = False
+        self._fit_pending = False
+
+        # Dark background
+        self.setStyleSheet("background-color: #181825;")
+        self.setMinimumSize(300, 200)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -42,23 +47,23 @@ class PdfRenderer(QWidget):
         self.scroll_area.setWidgetResizable(False)
         self.scroll_area.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.scroll_area.setStyleSheet(
-            "QScrollArea { background: #181825; border: none; }"
+            "QScrollArea { background-color: #181825; border: none; }"
+            "QScrollArea > QWidget > QWidget { background-color: #181825; }"
         )
         layout.addWidget(self.scroll_area)
 
         self.image_label = QLabel()
         self.image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.image_label.setStyleSheet("background: #181825; padding: 8px;")
+        self.image_label.setStyleSheet(
+            "background-color: #181825; padding: 8px;"
+        )
         self.scroll_area.setWidget(self.image_label)
-
-        # Intercept scroll area viewport wheel events → route to our handler
         self.scroll_area.viewport().installEventFilter(self)
 
-        self.setMinimumSize(300, 200)
-        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+    # ── Document lifecycle ──
 
     def eventFilter(self, obj, event):
-        """Intercept scroll area viewport events → route to our handlers."""
+        """Intercept scroll area viewport events → PdfRenderer handlers."""
         if obj == self.scroll_area.viewport():
             if event.type() == QEvent.Type.Wheel:
                 self.wheelEvent(event)
@@ -69,38 +74,40 @@ class PdfRenderer(QWidget):
         return super().eventFilter(obj, event)
 
     def load_document(self, doc: fitz.Document):
-        """Load a fitz Document and render page 0."""
+        """Load document and schedule first render."""
         self.doc = doc
         self._total_pages = doc.page_count
         self._page_num = 0
+        self._zoom = 2.0
+        self._fit_pending = False
         self._render_current()
-
-    def showEvent(self, event):
-        """Auto-fit page to viewport width on first show (deferred for layout)."""
-        super().showEvent(event)
-        if self.doc is not None and not self._shown:
-            self._shown = True
-            # Defer to next event loop iteration so the splitter has allocated space
-            QTimer.singleShot(0, self._fit_to_width)
+        # Schedule fit-to-width after layout settles
+        if not self._fit_pending:
+            self._fit_pending = True
+            QTimer.singleShot(100, self._fit_to_width)
 
     def _fit_to_width(self):
-        """Calculate zoom so page width fills the viewport."""
-        vpw = self.scroll_area.viewport().width() - 32  # leave margins
-        if vpw <= 0:
+        """Adjust zoom so page width fills the viewport."""
+        self._fit_pending = False
+        if self.doc is None:
             return
-        pw = self.doc[0].rect.width  # page width in points
-        target = vpw / pw
-        # Snap to nearest ZOOM_STEP
+        vpw = self.scroll_area.viewport().width()
+        if vpw < 100:
+            # Too narrow, retry later
+            self._fit_pending = True
+            QTimer.singleShot(200, self._fit_to_width)
+            return
+        pw = self.doc[0].rect.width
+        target_zoom = vpw / pw
+        # Clamp and snap
         self._zoom = max(self.ZOOM_MIN, min(
-            round(target / self.ZOOM_STEP) * self.ZOOM_STEP,
+            round(target_zoom / self.ZOOM_STEP) * self.ZOOM_STEP,
             self.ZOOM_MAX,
         ))
-        if self._zoom < 0.5:
-            self._zoom = 0.5  # safety floor
         self._render_current()
 
     def _render_current(self):
-        """Render the current page at current zoom and display at full size."""
+        """Render current page at current zoom and display."""
         if self.doc is None:
             return
         page = self.doc[self._page_num]
@@ -111,10 +118,19 @@ class PdfRenderer(QWidget):
         self.image_label.setPixmap(self._pixmap)
         self.zoom_changed.emit(self._zoom)
 
+    def close_document(self):
+        """Release resources."""
+        self.doc = None
+        self._pixmap = None
+        self.image_label.clear()
+        self._page_num = 0
+        self._total_pages = 0
+        self._fit_pending = False
+
     # ── Zoom ──
 
     def wheelEvent(self, event):
-        """Ctrl+wheel to zoom in/out. Plain wheel scrolls pages."""
+        """Ctrl+wheel zoom. Plain wheel page turn."""
         if self.doc is None:
             return
         if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
@@ -143,7 +159,6 @@ class PdfRenderer(QWidget):
     # ── Page navigation ──
 
     def goto_page(self, page_num: int):
-        """Navigate to a specific page (0-indexed)."""
         if self.doc is None:
             return
         page_num = max(0, min(page_num, self._total_pages - 1))
@@ -167,12 +182,12 @@ class PdfRenderer(QWidget):
     def page_count(self) -> int:
         return self._total_pages
 
-    # ── Keyboard navigation ──
+    # ── Keyboard ──
 
     def keyPressEvent(self, event):
-        if event.key() == Qt.Key.Key_Left or event.key() == Qt.Key.Key_Up:
+        if event.key() in (Qt.Key.Key_Left, Qt.Key.Key_Up):
             self.prev_page()
-        elif event.key() == Qt.Key.Key_Right or event.key() == Qt.Key.Key_Down:
+        elif event.key() in (Qt.Key.Key_Right, Qt.Key.Key_Down):
             self.next_page()
         elif event.key() == Qt.Key.Key_Home:
             self.goto_page(0)
@@ -184,48 +199,42 @@ class PdfRenderer(QWidget):
     # ── Click-to-extract text ──
 
     def mousePressEvent(self, event):
-        """Click on a page → extract nearby text → emit text_selected."""
         if self.doc is None or self._pixmap is None:
             return
         if event.button() != Qt.MouseButton.LeftButton:
             return
 
-        label_pixmap = self.image_label.pixmap()
-        if label_pixmap is None:
+        lp = self.image_label.pixmap()
+        if lp is None:
             return
         x = event.position().x()
         y = event.position().y()
 
-        # Convert from label coordinates to page coordinates
-        label_w = self.image_label.width()
-        label_h = self.image_label.height()
-        pix_w = label_pixmap.width()
-        pix_h = label_pixmap.height()
-        offset_x = max(0, (label_w - pix_w) // 2)
-        offset_y = max(0, (label_h - pix_h) // 2)
+        # Convert label coordinates to page coordinates
+        lw = self.image_label.width()
+        lh = self.image_label.height()
+        pw = lp.width()
+        ph = lp.height()
+        ox = max(0, (lw - pw) // 2)
+        oy = max(0, (lh - ph) // 2)
 
-        # Check if click is within the pixmap area
-        if x < offset_x or x > offset_x + pix_w or y < offset_y or y > offset_y + pix_h:
-            return  # clicked outside image
+        if x < ox or x > ox + pw or y < oy or y > oy + ph:
+            return
 
-        # Scale to full-resolution page coordinates
         scale = self._zoom
-        page_x = (x - offset_x) * (self._pixmap.width() / scale) / pix_w
-        page_y = (y - offset_y) * (self._pixmap.height() / scale) / pix_h
+        px = (x - ox) * (self._pixmap.width() / scale) / pw
+        py = (y - oy) * (self._pixmap.height() / scale) / ph
 
-        # Extract words near the click point (within a 200x100pt rectangle)
         page = self.doc[self._page_num]
-        clip = fitz.Rect(page_x - 100, page_y - 50, page_x + 100, page_y + 50)
+        clip = fitz.Rect(px - 100, py - 50, px + 100, py + 50)
         words = page.get_text("words", clip=clip)
         if not words:
             return
 
-        # Sort by distance to click point, take nearest words
         sorted_words = sorted(
             words,
-            key=lambda w: ((w[0] + w[2]) / 2 - page_x) ** 2 + ((w[1] + w[3]) / 2 - page_y) ** 2,
+            key=lambda w: ((w[0] + w[2]) / 2 - px) ** 2 + ((w[1] + w[3]) / 2 - py) ** 2,
         )
-        # Take top words (up to ~200 chars)
         text = " ".join(w[4] for w in sorted_words[:10])
         if len(text) < 5:
             return
@@ -233,16 +242,6 @@ class PdfRenderer(QWidget):
         self.text_selected.emit(text.strip())
 
     def get_current_page_text(self) -> str:
-        """Return full text of current page (for 'analyze page' fallback)."""
         if self.doc is None:
             return ""
-        page = self.doc[self._page_num]
-        return page.get_text()
-
-    def close_document(self):
-        """Release document resources."""
-        self.doc = None
-        self._pixmap = None
-        self.image_label.clear()
-        self._page_num = 0
-        self._total_pages = 0
+        return self.doc[self._page_num].get_text()
