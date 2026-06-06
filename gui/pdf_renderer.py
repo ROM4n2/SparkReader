@@ -9,7 +9,7 @@ _PROJ_ROOT = os.path.abspath(os.path.join(_RDR_DIR, ".."))
 sys.path.insert(0, _PROJ_ROOT)
 sys.path.insert(0, os.path.join(_PROJ_ROOT, "backend"))
 
-from PySide6.QtCore import Qt, Signal, QEvent
+from PySide6.QtCore import Qt, Signal, QEvent, QTimer
 from PySide6.QtGui import QPixmap, QImage
 from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QScrollArea
 import fitz  # PyMuPDF
@@ -76,11 +76,12 @@ class PdfRenderer(QWidget):
         self._render_current()
 
     def showEvent(self, event):
-        """Auto-fit page to viewport width on first show."""
+        """Auto-fit page to viewport width on first show (deferred for layout)."""
         super().showEvent(event)
         if self.doc is not None and not self._shown:
             self._shown = True
-            self._fit_to_width()
+            # Defer to next event loop iteration so the splitter has allocated space
+            QTimer.singleShot(0, self._fit_to_width)
 
     def _fit_to_width(self):
         """Calculate zoom so page width fills the viewport."""
