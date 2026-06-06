@@ -21,6 +21,9 @@ class PdfRenderer(QWidget):
     page_changed = Signal(int)
     text_selected = Signal(str)
     zoom_changed = Signal(float)
+    auto_analyze_requested = Signal(str)  # full page text after idle timeout
+
+    IDLE_TIMEOUT = 8000  # ms — auto-analyze after this long on same page
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -31,6 +34,12 @@ class PdfRenderer(QWidget):
         self._render_zoom = 2.0
         self._pixmap: QPixmap | None = None
         self._pix_item = None
+
+        # Idle timer for auto-analyze
+        self._idle_timer = QTimer()
+        self._idle_timer.setSingleShot(True)
+        self._idle_timer.setInterval(self.IDLE_TIMEOUT)
+        self._idle_timer.timeout.connect(self._on_idle_timeout)
 
         self.setMinimumSize(300, 200)
 
@@ -66,11 +75,24 @@ class PdfRenderer(QWidget):
 
     # ── Document lifecycle ──
 
+    def _reset_idle_timer(self):
+        """Reset the auto-analyze idle timer."""
+        self._idle_timer.stop()
+        self._idle_timer.start()
+
+    def _on_idle_timeout(self):
+        """Emit full page text for auto-analysis."""
+        if self.doc is not None:
+            text = self.get_current_page_text()
+            if len(text.strip()) > 50:
+                self.auto_analyze_requested.emit(text[:2000])
+
     def load_document(self, doc: fitz.Document):
         self.doc = doc
         self._total_pages = doc.page_count
         self._page_num = 0
         self._render_current()
+        self._reset_idle_timer()
         # Wait for layout, then fit to viewport
         QTimer.singleShot(50, self._fit_in_view)
 
@@ -96,6 +118,7 @@ class PdfRenderer(QWidget):
         self.scene.setSceneRect(QRectF(self._pixmap.rect()))
 
     def close_document(self):
+        self._idle_timer.stop()
         self.doc = None
         self._pixmap = None
         self._pix_item = None
@@ -113,6 +136,7 @@ class PdfRenderer(QWidget):
             factor = 1.25 if event.angleDelta().y() > 0 else 0.8
             self.view.scale(factor, factor)
             self.zoom_changed.emit(self.view.transform().m11())
+            self._reset_idle_timer()
             event.accept()
         else:
             if event.angleDelta().y() > 0:
@@ -139,6 +163,7 @@ class PdfRenderer(QWidget):
         self._page_num = page_num
         self._render_current()
         self._fit_in_view()
+        self._reset_idle_timer()
         self.page_changed.emit(self._page_num)
 
     def prev_page(self):

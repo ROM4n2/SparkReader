@@ -275,6 +275,7 @@ class ReaderTab(QWidget):
         self.pdf_renderer.page_changed.connect(self._on_pdf_page_changed)
         self.pdf_renderer.text_selected.connect(self._on_pdf_text_selected)
         self.pdf_renderer.zoom_changed.connect(self._on_pdf_zoom_changed)
+        self.pdf_renderer.auto_analyze_requested.connect(self._on_pdf_auto_analyze)
 
         # UI state
         self.total_pages = doc.page_count
@@ -300,6 +301,10 @@ class ReaderTab(QWidget):
 
     def _on_pdf_text_selected(self, text: str):
         """Trigger AI analysis on clicked PDF text."""
+        self._trigger_analysis(text)
+
+    def _on_pdf_auto_analyze(self, text: str):
+        """Auto-analysis triggered by idle timer."""
         self._trigger_analysis(text)
 
     def _on_pdf_zoom_changed(self, zoom: float):
