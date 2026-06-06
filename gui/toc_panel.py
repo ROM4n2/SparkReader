@@ -30,36 +30,25 @@ class TocPanel(QWidget):
         layout.setSpacing(0)
 
         header = QLabel("📖 目录")
-        header.setStyleSheet(
-            "font-weight: 600; padding: 12px; font-size: 14px;"
-            " border-bottom: 1px solid #2a2a3e;"
-        )
+        header.setProperty("class", "panel-header")
         layout.addWidget(header)
 
         self.stack = QStackedWidget()
 
-        self.empty_label = QLabel("(本文件无目录)")
+        self.empty_label = QLabel("📂 打开文件后\n自动显示目录")
         self.empty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.empty_label.setStyleSheet("color: #555; padding: 12px;")
+        self.empty_label.setProperty("class", "empty-state")
         self.stack.addWidget(self.empty_label)
 
         self.tree = QTreeWidget()
         self.tree.setHeaderHidden(True)
         self.tree.setIndentation(16)
-        self.tree.setStyleSheet(
-            "QTreeWidget { background: transparent; border: none; font-size: 13px; }"
-            "QTreeWidget::item { padding: 6px 8px; }"
-            "QTreeWidget::item:hover { background: #2a2a3e; }"
-        )
+        self.tree.setProperty("class", "sidebar")
         self.tree.itemClicked.connect(self._on_tree_clicked)
         self.stack.addWidget(self.tree)
 
         self.list_widget = QListWidget()
-        self.list_widget.setStyleSheet(
-            "QListWidget { background: transparent; border: none; font-size: 13px; }"
-            "QListWidget::item { padding: 6px 8px; }"
-            "QListWidget::item:hover { background: #2a2a3e; }"
-        )
+        self.list_widget.setProperty("class", "sidebar")
         self.list_widget.itemClicked.connect(self._on_list_clicked)
         self.stack.addWidget(self.list_widget)
 

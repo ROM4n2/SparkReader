@@ -316,3 +316,62 @@ QMessageBox QLabel {
 QMessageBox QPushButton {
     min-width: 80px;
 }
+
+/* ── Shared sidebar / list panel ── */
+QListWidget.sidebar, QTreeWidget.sidebar {
+    background-color: rgba(24, 24, 37, 0.85);
+    border: none;
+    border-right: 1px solid rgba(69, 71, 90, 0.2);
+    outline: none;
+    font-size: 13px;
+}
+
+QListWidget.sidebar::item, QTreeWidget.sidebar::item {
+    padding: 10px 16px;
+    border-bottom: 1px solid rgba(69, 71, 90, 0.1);
+}
+
+QListWidget.sidebar::item:selected, QTreeWidget.sidebar::item:selected {
+    background-color: rgba(203, 166, 247, 0.12);
+    border-left: 3px solid #cba6f7;
+    color: #cdd6f4;
+}
+
+QListWidget.sidebar::item:hover:!selected,
+QTreeWidget.sidebar::item:hover:!selected {
+    background-color: rgba(255, 255, 255, 0.04);
+}
+
+/* ── Panel headers ── */
+QLabel.panel-header {
+    font-weight: 600;
+    padding: 12px;
+    font-size: 14px;
+    border-bottom: 1px solid #2a2a3e;
+}
+
+/* ── Empty-state text ── */
+QLabel.empty-state {
+    color: #555870;
+    font-size: 14px;
+    padding: 20px;
+}
+
+/* ── Secondary / subdued text ── */
+QLabel.secondary-text {
+    color: #555870;
+    font-size: 12px;
+}
+
+/* ── Document list panel ── */
+QListWidget.doc-list {
+    background: #14151c;
+    border: 1px solid #252730;
+    border-radius: 6px;
+    padding: 8px;
+}
+
+QListWidget.doc-list::item {
+    padding: 10px 12px;
+    border-bottom: 1px solid #1e202a;
+}

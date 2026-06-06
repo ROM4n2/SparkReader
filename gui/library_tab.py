@@ -86,17 +86,13 @@ class LibraryTab(QWidget):
 
         # ── Document list ──
         self.doc_list = QListWidget()
-        self.doc_list.setStyleSheet(
-            "QListWidget { background: #14151c; border: 1px solid #252730;"
-            " border-radius: 6px; padding: 8px; }"
-            "QListWidget::item { padding: 10px 12px; border-bottom: 1px solid #1e202a; }"
-        )
+        self.doc_list.setProperty("class", "doc-list")
         layout.addWidget(self.doc_list, 1)
 
         # ── Bottom bar ──
         bottom = QHBoxLayout()
         self.count_label = QLabel("")
-        self.count_label.setStyleSheet("color: #555870; font-size: 12px;")
+        self.count_label.setProperty("class", "secondary-text")
         bottom.addWidget(self.count_label)
         bottom.addStretch()
 
