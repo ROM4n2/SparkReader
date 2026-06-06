@@ -22,8 +22,8 @@ class MainWindow(QMainWindow):
         self.resize(1100, 720)
 
         self.tabs = QTabWidget()
-        self.tabs.setTabPosition(QTabWidget.TabPosition.West)
-        self.tabs.setTabShape(QTabWidget.TabShape.Rounded)
+        self.tabs.setTabPosition(QTabWidget.TabPosition.North)
+        self.tabs.setDocumentMode(True)
         self.setCentralWidget(self.tabs)
 
         # All 4 tabs
