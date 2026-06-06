@@ -226,13 +226,13 @@ class ReaderTab(QWidget):
         toc = doc.get_toc()
         self.toc_panel.set_pdf_toc(toc or [])
 
-        # Replace center widget with PdfRenderer
+        # Replace reader with PdfRenderer in the splitter
         splitter = self.findChild(QSplitter)
-        self.reader.hide()
+        idx = splitter.indexOf(self.reader)
         self.pdf_renderer = PdfRenderer()
         self.pdf_renderer.load_document(doc)
-        idx = splitter.indexOf(self.reader)
-        splitter.insertWidget(idx, self.pdf_renderer)
+        splitter.replaceWidget(idx, self.pdf_renderer)
+        self.reader.hide()
 
         # Wire signals
         self.pdf_renderer.page_changed.connect(self._on_pdf_page_changed)
@@ -293,11 +293,14 @@ class ReaderTab(QWidget):
 
     def _close_file(self):
         self.reader.clear()
-        self.reader.show()
         if hasattr(self, 'pdf_renderer'):
+            splitter = self.findChild(QSplitter)
+            idx = splitter.indexOf(self.pdf_renderer)
+            splitter.replaceWidget(idx, self.reader)
             self.pdf_renderer.close_document()
             self.pdf_renderer.deleteLater()
             del self.pdf_renderer
+        self.reader.show()
         self.current_file = None
         self.file_label.setText("")
         self.clear_btn.hide()
