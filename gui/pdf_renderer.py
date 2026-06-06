@@ -15,10 +15,15 @@ from PySide6.QtWidgets import QWidget, QVBoxLayout, QLabel, QScrollArea
 import fitz
 
 
+_DEBUG_LOG = os.path.join(
+    os.environ.get("TEMP", os.environ.get("TMP", "/tmp")),
+    "spark_pdf_debug.txt",
+)
+
 def _debug(msg: str):
     """Write debug info to a temp file."""
     try:
-        with open("C:/temp/spark_pdf_debug.txt", "a", encoding="utf-8") as f:
+        with open(_DEBUG_LOG, "a", encoding="utf-8") as f:
             f.write(msg + "\n")
     except Exception:
         pass
@@ -82,13 +87,25 @@ class PdfRenderer(QWidget):
         self._started = False
         _debug(f"load_document: pages={doc.page_count}, rect={doc[0].rect}")
         self._render_current()
+        # Try fitting immediately in case resizeEvent already fired
+        self._try_fit()
 
-    def showEvent(self, event):
-        super().showEvent(event)
-        if not self._started and self.doc is not None:
-            self._started = True
-            _debug("showEvent fired, scheduling fit-to-width")
-            QTimer.singleShot(0, self._fit_to_width)
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        if self.doc and not self._started:
+            self._try_fit()
+
+    def _try_fit(self):
+        """Fit to width if we have enough size."""
+        if self._started or self.doc is None:
+            return
+        w = self.width()
+        _debug(f"_try_fit: widget_width={w}")
+        if w < 100:
+            _debug("too narrow, deferring")
+            return
+        self._started = True
+        QTimer.singleShot(0, self._fit_to_width)
 
     def _fit_to_width(self):
         """Set zoom so page width fills the viewport."""
