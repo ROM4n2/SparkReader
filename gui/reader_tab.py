@@ -75,9 +75,17 @@ class ReaderTab(QWidget):
         self.reader = QPlainTextEdit()
         self.reader.setReadOnly(True)
         self.reader.setStyleSheet(
-            "QPlainTextEdit { background: #13131f; color: #f0e6d3;"
-            " font-size: 15px; padding: 16px; line-height: 1.8;"
-            " border: none; }"
+            "QPlainTextEdit {"
+            "  background: #181825; color: #e0e0e0;"
+            "  font-size: 15px; padding: 20px 24px;"
+            "  line-height: 1.9; border: none;"
+            "  font-family: 'Microsoft YaHei', 'Noto Sans SC', 'Segoe UI', sans-serif;"
+            "}"
+        )
+        self.reader.setLineWrapMode(QPlainTextEdit.LineWrapMode.WidgetWidth)
+        # Add paragraph spacing by inserting extra blank line between paragraphs
+        self.reader.document().setDefaultStyleSheet(
+            "p { margin-bottom: 12px; }"
         )
         self.reader.cursorPositionChanged.connect(self._on_cursor_moved)
         splitter.addWidget(self.reader)
@@ -127,6 +135,10 @@ class ReaderTab(QWidget):
 
         try:
             content = parse_file(file_path)
+            # Normalize paragraph spacing: ensure double newline between paragraphs
+            import re
+            content = re.sub(r"\n{3,}", "\n\n", content)  # collapse excessive gaps
+            content = re.sub(r"([^\n])\n([^\n])", r"\1\n\n\2", content)  # single newline → paragraph break
             self.reader.setPlainText(content)
             self.current_file = file_path
             name = Path(file_path).name
@@ -207,6 +219,7 @@ class ReaderTab(QWidget):
         self.status_label.setText("🧠 后台分析中...")
 
         # Fire up background thread
+        self._current_prompt = prompt
         self._thread = QThread()
         self._worker = AiWorker(prompt)
         self._worker.moveToThread(self._thread)
@@ -215,15 +228,15 @@ class ReaderTab(QWidget):
         self._worker.error.connect(self._on_explain_error)
         self._worker.finished.connect(self._thread.quit)
         self._worker.error.connect(self._thread.quit)
-        self._thread.finished.connect(self._thread.deleteLater)
         self._thread.start()
 
     def _on_explain_done(self, response: str):
         """Handle successful explanation from background thread."""
+        self._thread = None
         response = response.strip() or "(无响应)"
         html_text = response.replace("\n", "<br>")
         self.explain_browser.setHtml(
-            f'<div style="color: #f0e6d3; font-size: 14px; line-height: 1.7;">'
+            f'<div style="color: #cdd6f4; font-size: 14px; line-height: 1.7;">'
             f'{html_text}</div>'
         )
         self.status_label.setText("✅ 分析完成")
@@ -234,9 +247,10 @@ class ReaderTab(QWidget):
 
     def _on_explain_error(self, error_msg: str):
         """Handle explanation failure from background thread."""
+        self._thread = None
         self.status_label.setText("⚠️ 分析失败")
         self.explain_browser.setHtml(
-            f'<div style="color: #c4956a; font-size: 13px;">'
+            f'<div style="color: #f38ba8; font-size: 13px;">'
             f'分析失败: {error_msg[:100]}</div>'
         )
 

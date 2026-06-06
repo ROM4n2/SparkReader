@@ -313,11 +313,11 @@ class ChatTab(QWidget):
         self._worker.error.connect(self._on_chat_error)
         self._worker.finished.connect(self._thread.quit)
         self._worker.error.connect(self._thread.quit)
-        self._thread.finished.connect(self._thread.deleteLater)
         self._thread.start()
 
     def _on_chat_done(self, response: str):
         """Handle successful AI response from background thread."""
+        self._thread = None
         self.send_btn.setEnabled(True)
         self.send_btn.setText("发送")
         if self.current_conv_id is None:
@@ -329,6 +329,7 @@ class ChatTab(QWidget):
 
     def _on_chat_error(self, error_msg: str):
         """Handle AI response failure from background thread."""
+        self._thread = None
         self.send_btn.setEnabled(True)
         self.send_btn.setText("发送")
         QMessageBox.warning(self, "错误", f"AI 回答失败:\n{error_msg}")
