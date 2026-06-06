@@ -35,3 +35,4 @@ call .venv\Scripts\activate.bat
 echo.
 
 python main.py %*
+pause
