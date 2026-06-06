@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
 )
 
 from gui.settings_tab import SettingsTab
+from gui.chat_tab import ChatTab
 
 
 class MainWindow(QMainWindow):
@@ -24,7 +25,7 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(self.tabs)
 
         # Phase 1 tabs
-        self.chat_tab = self._make_placeholder("💬 问答", "聊天功能即将上线")
+        self.chat_tab = ChatTab(settings_getter=self.get_settings)
         self.settings_tab = SettingsTab()
 
         self.tabs.addTab(self.chat_tab, "💬 问答")
@@ -43,3 +44,7 @@ class MainWindow(QMainWindow):
 
     def get_settings(self) -> SettingsTab:
         return self.settings_tab
+
+    def closeEvent(self, event):
+        self.chat_tab.close_client()
+        super().closeEvent(event)
