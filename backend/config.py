@@ -7,7 +7,14 @@ import os
 # --- Ollama settings ---
 OLLAMA_BASE_URL = os.getenv("OLLAMA_HOST", "http://localhost:11434")
 CHAT_MODEL = "qwen2.5:7b"           # Main model for Q&A and explanations
-EMBED_MODEL = "nomic-embed-text"    # For future RAG phase
+EMBED_MODEL = "nomic-embed-text"    # Embedding model for RAG
+
+# --- RAG settings ---
+CHROMA_PERSIST_DIR = os.path.join(os.path.dirname(__file__), "..", "chroma_db")  # Vector DB storage
+CHUNK_SIZE = 300                     # Characters per chunk (Chinese: char ≈ token)
+CHUNK_OVERLAP = 50                   # Overlap between adjacent chunks
+RAG_TOP_K = 3                        # Number of chunks to retrieve for context
+DOCUMENTS_DIR = os.path.join(os.path.dirname(__file__), "..", "documents")  # Where to look for text files
 
 # Windows Chinese username workaround:
 # If model loading fails with garbled path error, set this env var
@@ -40,4 +47,12 @@ CONTEXT_QA_TEMPLATE = (
 DIRECT_QA_TEMPLATE = (
     "用户的问题是：{question}\n\n"
     "请用中文回答，准确、有深度。"
+)
+
+RAG_PROMPT_TEMPLATE = (
+    "你是一个马列经典著作阅读助手。请基于以下参考资料回答用户的问题。\n\n"
+    "参考资料：\n{context}\n\n"
+    "用户的问题是：{question}\n\n"
+    "请基于参考资料回答，引用原文时注明出处。如果参考资料不足以回答，"
+    "请结合你自己的知识进行补充。"
 )

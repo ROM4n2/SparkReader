@@ -6,15 +6,12 @@ Spark - 马列经典著作 AI 阅读助手 (MVP)
 2. 主动模式 - 用户输入问题，AI 回答
 
 启动方式：
-    python main.py            # 同时启动两种模式
-    python main.py --chat     # 仅交互问答模式
-    python main.py --watch    # 仅剪贴板监控模式
-
-注意：
-    - Ollama 服务需先启动（系统托盘中应有 Ollama 图标）
-    - 如果用户名含中文导致模型加载失败，请设置环境变量：
-      set OLLAMA_MODELS=C:\ollama_models
-      再重启 Ollama 服务
+    python main.py                 # 剪贴板监控 + 问答（双模式）
+    python main.py --chat          # 仅交互问答模式
+    python main.py --watch         # 仅剪贴板监控模式
+    python main.py --rag           # RAG 问答模式（基于已导入的文档）
+    python main.py --ingest        # 导入文档到向量库后退出
+    python ingest.py --info        # 查看向量库状态
 """
 import sys
 import threading
@@ -33,6 +30,12 @@ from config import (
 )
 from ollama_client import OllamaClient
 from clipboard_monitor import ClipboardMonitor
+
+try:
+    from rag_engine import RAGEngine
+    _HAS_RAG = True
+except ImportError:
+    _HAS_RAG = False
 
 
 # Shared reference to latest clipboard text (for Q&A context)
@@ -103,6 +106,51 @@ def run_interactive_qa():
         client.close()
 
 
+def run_rag_qa():
+    """
+    Interactive RAG-powered Q&A loop.
+    Uses vector search on ingested documents to provide context-grounded answers.
+    """
+    if not _HAS_RAG:
+        print("❌ RAG 引擎不可用（缺少 chromadb 依赖）")
+        print("   请运行: pip install chromadb")
+        return
+
+    engine = RAGEngine()
+    doc_count = engine.collection.count()
+    print("\n📚 Spark RAG 问答模式")
+    print(f"   向量库: {doc_count} 个文档片段")
+    if doc_count == 0:
+        print("   ⚠️  向量库为空，将使用直接问答模式")
+        print("   请先运行: python ingest.py")
+    print("   输入 /clear 清屏，/exit 或 Ctrl+C 退出\n")
+
+    try:
+        while True:
+            try:
+                question = input("❓ ").strip()
+            except (EOFError, KeyboardInterrupt):
+                print()
+                break
+
+            if not question:
+                continue
+            if question.lower() in ("/exit", "/quit", "/q"):
+                break
+            if question.lower() == "/clear":
+                print("\033[2J\033[H", end="")
+                continue
+
+            try:
+                print("\n🤔 正在思考...")
+                response = engine.ask(question)
+                print(f"\n💡 {response}\n")
+            except (ConnectionError, RuntimeError) as e:
+                print(f"\n⚠️  错误: {e}\n")
+    finally:
+        engine.close()
+
+
 def pre_flight_check() -> bool:
     """
     Check that Ollama is running and the required model is available.
@@ -133,15 +181,25 @@ def main():
     parser = argparse.ArgumentParser(description="Spark - 马列经典著作 AI 阅读助手")
     parser.add_argument("--chat", action="store_true", help="仅启动问答模式")
     parser.add_argument("--watch", action="store_true", help="仅启动剪贴板监控")
+    parser.add_argument("--rag", action="store_true", help="RAG 增强问答模式（基于已导入的文档）")
+    parser.add_argument("--ingest", action="store_true", help="导入文档到向量库后退出")
     args = parser.parse_args()
 
-    print("🔥 Spark 已启动\n")
+    # Pre-flight check (skip for --ingest since it doesn't need the chat model)
+    if not args.ingest:
+        print("🔥 Spark 已启动\n")
+        if not pre_flight_check():
+            sys.exit(1)
+    else:
+        print("🔥 Spark - 文档导入模式\n")
 
-    # Pre-flight check
-    if not pre_flight_check():
-        sys.exit(1)
-
-    if args.chat:
+    if args.ingest:
+        # Import documents and exit
+        from ingest import main as ingest_main
+        ingest_main()
+    elif args.rag:
+        run_rag_qa()
+    elif args.chat:
         run_interactive_qa()
     elif args.watch:
         monitor = ClipboardMonitor()
