@@ -13,7 +13,7 @@ from PySide6.QtCore import Qt, QTimer, QThread
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QPlainTextEdit, QTextBrowser, QSplitter, QLabel,
-    QFileDialog, QMessageBox,
+    QFileDialog, QMessageBox, QLineEdit,
 )
 from pathlib import Path
 
@@ -151,6 +151,17 @@ class ReaderTab(QWidget):
         self.page_label = QLabel("")
         self.page_label.setStyleSheet("color: #888; font-size: 12px; margin: 0 8px;")
         status_layout.addWidget(self.page_label)
+
+        self.page_input = QLineEdit()
+        self.page_input.setPlaceholderText("跳转")
+        self.page_input.setFixedWidth(60)
+        self.page_input.setStyleSheet(
+            "QLineEdit { padding: 2px 6px; font-size: 12px;"
+            " background: #2a2a3e; border: 1px solid #444;"
+            " border-radius: 4px; color: #cdd6f4; }"
+        )
+        self.page_input.returnPressed.connect(self._jump_to_page)
+        status_layout.addWidget(self.page_input)
 
         self.prev_btn = QPushButton("◀")
         self.prev_btn.setFixedSize(28, 24)
@@ -297,6 +308,18 @@ class ReaderTab(QWidget):
 
     def _update_page_label(self):
         self.page_label.setText(f"第 {self.current_page + 1}/{self.total_pages} 页")
+
+    def _jump_to_page(self):
+        """Parse page input and jump to that page."""
+        text = self.page_input.text().strip()
+        self.page_input.clear()
+        try:
+            page = int(text)
+        except ValueError:
+            return
+        if hasattr(self, 'pdf_renderer'):
+            # PdfRenderer uses 0-indexed pages
+            self.pdf_renderer.goto_page(page - 1)
 
     def _trigger_analysis(self, text: str):
         """Send text to AI analysis (shared by PDF click and text cursor)."""
