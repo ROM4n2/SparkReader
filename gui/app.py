@@ -88,7 +88,7 @@ def run():
     tray.show()
 
     # Global hotkey: Ctrl+Shift+S to toggle window
-    hotkey = QShortcut(QKeySequence("Ctrl+Shift+S"), window)
+    hotkey = QShortcut(QKeySequence("Ctrl+Shift+S"), app)
     hotkey.activated.connect(lambda: _toggle_window(window))
 
     # Override close event to minimize to tray
