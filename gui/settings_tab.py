@@ -4,9 +4,10 @@ Settings persisted via QSettings (Windows Registry / INI fallback).
 """
 import sys
 import os
-_SET_DIR = os.path.dirname(__file__)
-sys.path.insert(0, os.path.join(_SET_DIR, ".."))           # project root
-sys.path.insert(0, os.path.join(_SET_DIR, "..", "backend"))  # backend/ for config imports
+_SET_DIR = os.path.abspath(os.path.dirname(__file__))
+_PROJ_ROOT = os.path.abspath(os.path.join(_SET_DIR, ".."))
+sys.path.insert(0, _PROJ_ROOT)                                    # project root
+sys.path.insert(0, os.path.join(_PROJ_ROOT, "backend"))           # backend/ for config imports
 
 import httpx
 from pathlib import Path
