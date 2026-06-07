@@ -11,7 +11,7 @@ sys.path.insert(0, _PROJ_ROOT)
 sys.path.insert(0, os.path.join(_PROJ_ROOT, "backend"))
 
 from PySide6.QtCore import Qt, QTimer, QThread
-from PySide6.QtGui import QTextCursor, QColor, QTextCharFormat, QAction
+from PySide6.QtGui import QTextCursor, QColor, QTextCharFormat
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
     QPlainTextEdit, QTextBrowser, QSplitter, QLabel,
@@ -246,9 +246,11 @@ class ReaderTab(QWidget):
 
     def _switch_to_explain(self):
         self.search_box.clear()
+        self.search_box.setPlaceholderText("点击段落自动分析...")
         self.right_stack.setCurrentIndex(0)
 
     def _switch_to_kg(self):
+        self.search_box.setPlaceholderText("🔍 搜索概念...")
         self.right_stack.setCurrentIndex(1)
 
     def _on_search_concept(self):
@@ -458,6 +460,10 @@ class ReaderTab(QWidget):
         self.status_label.setText(msg)
 
     def _run_in_thread(self, func, arg, callback):
+        # Guard: don't stomp on a running thread
+        if self._thread and self._thread.isRunning():
+            self._thread.quit()
+            self._thread.wait(1000)
         from PySide6.QtCore import Signal
 
         class _Worker(QThread):

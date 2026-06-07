@@ -61,7 +61,10 @@ def extract_concepts(concept_name: str, client: OllamaClient = None) -> list[dic
             items = json.loads(cleaned)
         except json.JSONDecodeError:
             match = re.search(r"\[.*\]", cleaned, re.DOTALL)
-            items = json.loads(match.group()) if match else []
+            try:
+                items = json.loads(match.group()) if match else []
+            except (json.JSONDecodeError, AttributeError):
+                items = []
 
         # 4. Save to DB
         knowledge_db.upsert_concept(concept_name)
@@ -73,7 +76,9 @@ def extract_concepts(concept_name: str, client: OllamaClient = None) -> list[dic
                 explanation=item.get("explanation", ""),
             )
 
-        return items
+        # Return consistent DB format (not raw LLM JSON) so callers
+        # get the same shape regardless of cache hit/miss.
+        return knowledge_db.get_relations(concept_name, max_depth=2)
 
     finally:
         if should_close:

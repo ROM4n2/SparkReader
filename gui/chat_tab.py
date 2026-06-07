@@ -232,12 +232,23 @@ class ChatTab(QWidget):
         for msg in messages:
             prefix = "🧑" if msg["role"] == "user" else "🤖"
             mode_tag = f" [{msg['mode']}]" if msg["mode"] != "direct" else ""
+            # Escape HTML and link known concepts in AI messages
+            content = msg["content"].replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+            if msg["role"] == "assistant":
+                concepts = knowledge_db.list_concepts()
+                for c in concepts:
+                    name = c["name"]
+                    if len(name) >= 3 and name in content:
+                        content = content.replace(
+                            name,
+                            f'<a href="kg:{name}" style="color:#c0392b;text-decoration:underline;font-weight:500;">{name}</a>'
+                        )
             html = (
                 f'<div style="margin: 8px 0; padding: 8px 12px;'
                 f' border-left: 3px solid {"#c4956a" if msg["role"] == "assistant" else "#555"};'
                 f' border-radius: 4px;">'
                 f'<div style="font-size: 12px; color: #888;">{prefix} {msg["created_at"][:16]}{mode_tag}</div>'
-                f'<div style="margin-top: 4px;">{msg["content"]}</div>'
+                f'<div style="margin-top: 4px;">{content}</div>'
                 f'</div>'
             )
             self.msg_browser.append(html)
