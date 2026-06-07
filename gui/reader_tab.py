@@ -784,14 +784,17 @@ class ReaderTab(QWidget):
         concept_name = extract_concepts_for_text(text)
         if concept_name:
             extract_concepts(concept_name)
-            return knowledge_db.get_relations(concept_name, max_depth=2)
+            relations = knowledge_db.get_relations(concept_name, max_depth=2)
+            return (concept_name, relations)
         return None
 
-    def _on_concept_chain_done(self, relations):
-        """Concept extraction complete — silently update KG cache."""
-        if relations:
+    def _on_concept_chain_done(self, result):
+        """Concept extraction complete — auto-display in KG panel."""
+        if result:
+            concept_name, relations = result
             direct = [r for r in relations if r.get("_depth", 1) == 1]
-            self._status_msg(f"✅ 分析完成 · 关联 {len(direct)} 个概念")
+            self.kg_panel.display_concept(concept_name)
+            self._status_msg(f"✅ 分析完成 · {concept_name} → {len(direct)} 个关联概念")
         else:
             self._status_msg("✅ 分析完成")
         self._last_analyzed_text = None
