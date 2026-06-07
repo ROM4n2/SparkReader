@@ -33,7 +33,6 @@ QTabBar::tab {
     font-weight: 500;
     letter-spacing: 1px;
     margin: 0 4px;
-    transition: all 0.2s ease;
 }
 
 QTabBar::tab:selected {
@@ -136,7 +135,6 @@ QLineEdit {
     padding: 10px 16px;
     color: #d4d4d8;
     font-size: 14px;
-    transition: border-color 0.2s ease;
 }
 
 QLineEdit:focus {
@@ -157,7 +155,6 @@ QPushButton {
     padding: 8px 20px;
     font-size: 14px;
     font-weight: 500;
-    transition: all 0.2s ease;
 }
 
 QPushButton:hover {
@@ -195,7 +192,6 @@ QComboBox {
     padding: 8px 14px;
     color: #d4d4d8;
     font-size: 14px;
-    transition: border-color 0.2s ease;
 }
 
 QComboBox:focus {
@@ -234,7 +230,6 @@ QCheckBox::indicator {
     border-radius: 5px;
     border: 2px solid #4b5563;
     background-color: #1a2230;
-    transition: all 0.2s ease;
 }
 
 QCheckBox::indicator:checked {
@@ -347,7 +342,6 @@ QScrollBar::handle:vertical {
     background-color: rgba(224, 112, 80, 0.3);
     border-radius: 3px;
     min-height: 30px;
-    transition: background-color 0.2s ease;
 }
 
 QScrollBar::handle:vertical:hover {
@@ -369,7 +363,6 @@ QScrollBar::handle:horizontal {
     background-color: rgba(224, 112, 80, 0.3);
     border-radius: 3px;
     min-width: 30px;
-    transition: background-color 0.2s ease;
 }
 
 QScrollBar::handle:horizontal:hover {
@@ -385,7 +378,6 @@ QScrollBar::add-line:horizontal, QScrollBar::sub-line:horizontal {
 QSplitter::handle {
     background-color: rgba(255, 255, 255, 0.04);
     width: 1px;
-    transition: background-color 0.2s ease;
 }
 
 QSplitter::handle:hover {
@@ -408,7 +400,6 @@ QMenu {
 QMenu::item {
     padding: 8px 24px;
     border-radius: 6px;
-    transition: background-color 0.15s ease;
 }
 
 QMenu::item:selected {
