@@ -10,7 +10,7 @@ _PROJ_ROOT = os.path.abspath(os.path.join(_RDR_DIR, ".."))
 sys.path.insert(0, _PROJ_ROOT)
 sys.path.insert(0, os.path.join(_PROJ_ROOT, "backend"))
 
-from PySide6.QtCore import Qt, QTimer, QThread
+from PySide6.QtCore import Qt, QTimer, QThread, Signal
 from PySide6.QtGui import QTextCursor, QColor, QTextCharFormat
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton,
@@ -38,6 +38,24 @@ PARAGRAPH_DETECT_PROMPT = (
     "立场：站在马列毛主义理论立场，而非当代中国特色社会主义话语体系。\n\n"
     "文本：\n{text}"
 )
+
+
+class _BackgroundWorker(QThread):
+    """Module-level QThread worker. Must be at module scope for Signal meta-object registration."""
+    finished = Signal(object)
+    error = Signal(str)
+
+    def __init__(self, fn, arg):
+        super().__init__()
+        self.fn = fn
+        self.arg = arg
+
+    def run(self):
+        try:
+            result = self.fn(self.arg)
+            self.finished.emit(result)
+        except Exception as e:
+            self.error.emit(str(e))
 
 
 class ReaderTab(QWidget):
@@ -464,25 +482,7 @@ class ReaderTab(QWidget):
         if self._thread and self._thread.isRunning():
             self._thread.quit()
             self._thread.wait(1000)
-        from PySide6.QtCore import Signal
-
-        class _Worker(QThread):
-            finished = Signal(object)
-            error = Signal(str)
-
-            def __init__(self, fn, a):
-                super().__init__()
-                self.fn = fn
-                self.arg = a
-
-            def run(self):
-                try:
-                    result = self.fn(self.arg)
-                    self.finished.emit(result)
-                except Exception as e:
-                    self.error.emit(str(e))
-
-        self._thread = _Worker(func, arg)
+        self._thread = _BackgroundWorker(func, arg)
         self._thread.finished.connect(callback)
         self._thread.error.connect(lambda e: self._status_msg(f"⚠️ 操作失败: {e[:80]}"))
         self._thread.start()
