@@ -186,8 +186,8 @@ class ReaderTab(QWidget):
         self.search_box.setPlaceholderText("🔍 搜索概念...")
         self.search_box.setStyleSheet(
             "QLineEdit { padding: 8px 12px; font-size: 13px;"
-            " background: #1a1a2a; border: none;"
-            " border-bottom: 1px solid #2a2a3e; color: #e0e0e6; }"
+            " background: #1a2230; border: none;"
+            " border-bottom: 1px solid rgba(255,255,255,0.06); color: #d4d4d8; }"
         )
         self.search_box.returnPressed.connect(self._on_search_concept)
         right_layout.addWidget(self.search_box)
@@ -232,8 +232,8 @@ class ReaderTab(QWidget):
         self.page_input.setFixedWidth(60)
         self.page_input.setStyleSheet(
             "QLineEdit { padding: 2px 6px; font-size: 12px;"
-            " background: #1e1e2a; border: 1px solid rgba(42,42,56,0.6);"
-            " border-radius: 4px; color: #e0e0e6; }"
+            " background: #1a2230; border: 1px solid rgba(255,255,255,0.08);"
+            " border-radius: 6px; color: #d4d4d8; }"
         )
         self.page_input.returnPressed.connect(self._jump_to_page)
         status_layout.addWidget(self.page_input)
@@ -257,7 +257,7 @@ class ReaderTab(QWidget):
 
         self.status_bar = QWidget()
         self.status_bar.setLayout(status_layout)
-        self.status_bar.setStyleSheet("border-top: 1px solid #2a2a3e;")
+        self.status_bar.setStyleSheet("border-top: 1px solid rgba(255,255,255,0.06);")
         self.status_bar.hide()
         layout.addWidget(self.status_bar)
 
@@ -319,9 +319,9 @@ class ReaderTab(QWidget):
             return
         start = cursor.selectionStart()
         end = cursor.selectionEnd()
-        knowledge_db.add_highlight(self.current_file, start, end, color="#c0392b")
+        knowledge_db.add_highlight(self.current_file, start, end, color="#e07050")
         fmt = QTextCharFormat()
-        fmt.setBackground(QColor("#c0392b"))
+        fmt.setBackground(QColor("#e07050"))
         fmt.setForeground(QColor("#ffffff"))
         cursor.mergeCharFormat(fmt)
         self._status_msg("✅ 已添加高亮")
@@ -469,7 +469,7 @@ class ReaderTab(QWidget):
         self._switch_to_explain()
         html = result.replace("\n", "<br>")
         self.explain_browser.setHtml(
-            f'<div style="color: #cdd6f4; font-size: 14px; line-height: 1.7;">{html}</div>'
+            f'<div style="color: #d4d4d8; font-size: 14px; line-height: 1.7;">{html}</div>'
         )
         self._status_msg("✅ 总结完成")
 
@@ -766,7 +766,7 @@ class ReaderTab(QWidget):
         response = response.strip() or "(无响应)"
         html_text = response.replace("\n", "<br>")
         self.explain_browser.setHtml(
-            f'<div style="color: #cdd6f4; font-size: 14px; line-height: 1.7;">'
+            f'<div style="color: #d4d4d8; font-size: 14px; line-height: 1.7;">'
             f'{html_text}</div>'
         )
         self._status_msg("⚡ 正在分析知识关联...")
@@ -815,7 +815,7 @@ class ReaderTab(QWidget):
         from PySide6.QtGui import QTextFormat
         cursor = self.reader.textCursor()
         selection = QTextEdit.ExtraSelection()
-        selection.format.setBackground(self._parse_color("#2a1f1a"))
+        selection.format.setBackground(self._parse_color("#161d27"))
         selection.format.setProperty(QTextFormat.FullWidthSelection, True)
         selection.cursor = cursor
         self.reader.setExtraSelections([selection])

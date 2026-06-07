@@ -45,7 +45,7 @@ class KnowledgeGraphPanel(QWidget):
         header = QLabel("🧠 知识图谱")
         header.setStyleSheet(
             "font-weight: 600; padding: 12px; font-size: 14px;"
-            " border-bottom: 1px solid #2a2a3e;"
+            " border-bottom: 1px solid rgba(255,255,255,0.06);"
         )
         layout.addWidget(header)
 
@@ -57,8 +57,8 @@ class KnowledgeGraphPanel(QWidget):
         self.search_input.setPlaceholderText("搜索概念...")
         self.search_input.setStyleSheet(
             "QLineEdit { padding: 6px 10px; font-size: 13px;"
-            " background: #1e1e2a; border: 1px solid rgba(42,42,56,0.6);"
-            " border-radius: 4px; color: #e0e0e6; }"
+            " background: #1a2230; border: 1px solid rgba(255,255,255,0.08);"
+            " border-radius: 6px; color: #d4d4d8; }"
         )
         self.search_input.returnPressed.connect(self._on_search)
         search_layout.addWidget(self.search_input)
@@ -88,8 +88,8 @@ class KnowledgeGraphPanel(QWidget):
         self.detail = QTextBrowser()
         self.detail.setMaximumHeight(150)
         self.detail.setStyleSheet(
-            "QTextBrowser { background: #181825; border-top: 1px solid #2a2a3e;"
-            " padding: 8px; font-size: 12px; color: #aaa; }"
+            "QTextBrowser { background: #161d27; border-top: 1px solid rgba(255,255,255,0.06);"
+            " padding: 8px; font-size: 12px; color: #9ca3af; }"
         )
         self.detail.setPlaceholderText("点击关联概念查看详情")
         layout.addWidget(self.detail)
@@ -163,6 +163,6 @@ class KnowledgeGraphPanel(QWidget):
         concept_name = item.data(0, Qt.ItemDataRole.UserRole) or ""
         if explanation:
             self.detail.setHtml(
-                f'<div style="color: #cdd6f4; font-size: 13px; line-height: 1.6;">'
+                f'<div style="color: #d4d4d8; font-size: 13px; line-height: 1.6;">'
                 f'<b>{concept_name}</b><br>{explanation}</div>'
             )

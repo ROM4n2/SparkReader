@@ -135,12 +135,13 @@ class ChatTab(QWidget):
     def _mode_style(self, active: bool) -> str:
         if active:
             return (
-                "QPushButton { background: #c0392b; color: #ffffff;"
-                " border: none; border-radius: 12px; padding: 4px 14px; font-size: 12px; font-weight: 700; }"
+                "QPushButton { background: rgba(224,112,80,0.12); color: #e07050;"
+                " border: 1px solid rgba(224,112,80,0.2); border-radius: 6px;"
+                " padding: 4px 14px; font-size: 12px; font-weight: 500; }"
             )
         return (
-            "QPushButton { background: rgba(42,42,56,0.5); color: #77778a;"
-            " border: none; border-radius: 12px; padding: 4px 14px; font-size: 12px; }"
+            "QPushButton { background: rgba(255,255,255,0.04); color: #6b7280;"
+            " border: none; border-radius: 6px; padding: 4px 14px; font-size: 12px; }"
         )
 
     def _set_mode(self, mode: str):
@@ -241,7 +242,7 @@ class ChatTab(QWidget):
                     if len(name) >= 3 and name in content:
                         content = content.replace(
                             name,
-                            f'<a href="kg:{name}" style="color:#c0392b;text-decoration:underline;font-weight:500;">{name}</a>'
+                            f'<a href="kg:{name}" style="color:#e07050;text-decoration:underline;font-weight:500;">{name}</a>'
                         )
             html = (
                 f'<div style="margin: 8px 0; padding: 8px 12px;'
