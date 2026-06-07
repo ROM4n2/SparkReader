@@ -479,13 +479,10 @@ class ReaderTab(QWidget):
         self.status_label.setText(msg)
 
     def _run_in_thread(self, func, arg, callback):
-        # Disconnect old bg thread signals to avoid stale callbacks
-        if self._bg_thread and self._bg_thread.isRunning():
-            try:
-                self._bg_thread.finished.disconnect()
-                self._bg_thread.error.disconnect()
-            except RuntimeError:
-                pass  # nothing connected
+        # Non-blocking guard: don't start if previous bg task still running
+        if self._bg_thread and not self._bg_thread.isFinished():
+            self._status_msg("⏳ 后台任务进行中，请稍候...")
+            return
         self._bg_thread = _BackgroundWorker(func, arg)
         self._bg_thread.finished.connect(callback)
         self._bg_thread.error.connect(lambda e: self._status_msg(f"⚠️ 操作失败: {e[:80]}"))

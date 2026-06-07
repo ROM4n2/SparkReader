@@ -4,6 +4,7 @@ Auto-creates DB at %APPDATA%/Spark/knowledge.db on first use.
 """
 import os
 import sqlite3
+import threading
 from pathlib import Path
 
 
@@ -13,18 +14,20 @@ def _get_db_path() -> str:
     return str(app_dir / "knowledge.db")
 
 
-_conn: sqlite3.Connection | None = None
+_local = threading.local()
 
 
 def _get_connection() -> sqlite3.Connection:
-    global _conn
-    if _conn is None:
-        _conn = sqlite3.connect(_get_db_path())
-        _conn.row_factory = sqlite3.Row
-        _conn.execute("PRAGMA journal_mode=WAL")
-        _conn.execute("PRAGMA foreign_keys=ON")
-        _init_schema(_conn)
-    return _conn
+    """Return a thread-local SQLite connection. Each thread gets its own."""
+    conn = getattr(_local, 'conn', None)
+    if conn is None:
+        conn = sqlite3.connect(_get_db_path())
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA foreign_keys=ON")
+        _local.conn = conn
+    _init_schema(conn)
+    return conn
 
 
 def _init_schema(conn: sqlite3.Connection):
@@ -275,8 +278,8 @@ def get_summaries(file_path: str) -> list[dict]:
 
 
 def close():
-    """Close the database connection."""
-    global _conn
-    if _conn:
-        _conn.close()
-        _conn = None
+    """Close this thread's database connection."""
+    conn = getattr(_local, 'conn', None)
+    if conn:
+        conn.close()
+        _local.conn = None

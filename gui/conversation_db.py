@@ -4,6 +4,7 @@ Auto-creates DB at %APPDATA%/Spark/conversations.db on first use.
 """
 import os
 import sqlite3
+import threading
 from datetime import datetime
 from pathlib import Path
 
@@ -15,18 +16,19 @@ def _get_db_path() -> str:
     return str(app_dir / "conversations.db")
 
 
-_conn: sqlite3.Connection | None = None
+_local = threading.local()
 
 
 def _get_connection() -> sqlite3.Connection:
-    """Get or create the persistent DB connection."""
-    global _conn
-    if _conn is None:
-        _conn = sqlite3.connect(_get_db_path())
-        _conn.row_factory = sqlite3.Row
-        _conn.execute("PRAGMA journal_mode=WAL")
-        _init_schema(_conn)
-    return _conn
+    """Return a thread-local SQLite connection."""
+    conn = getattr(_local, 'conn', None)
+    if conn is None:
+        conn = sqlite3.connect(_get_db_path())
+        conn.row_factory = sqlite3.Row
+        conn.execute("PRAGMA journal_mode=WAL")
+        _init_schema(conn)
+        _local.conn = conn
+    return conn
 
 
 def _init_schema(conn: sqlite3.Connection):
