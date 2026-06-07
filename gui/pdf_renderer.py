@@ -30,8 +30,8 @@ class PdfRenderer(QWidget):
         self.doc: fitz.Document | None = None
         self._page_num = 0
         self._total_pages = 0
-        # Fixed high-DPI render quality (144 DPI base = crisp text after downscale)
-        self._render_zoom = 2.0
+        # Render at 216 DPI (72×3) for crisp text on modern displays
+        self._render_zoom = 3.0
         self._pixmap: QPixmap | None = None
         self._pix_item = None
 
@@ -160,9 +160,15 @@ class PdfRenderer(QWidget):
         page_num = max(0, min(page_num, self._total_pages - 1))
         if page_num == self._page_num:
             return
+        # Save current user zoom before fitInView resets it
+        saved_zoom = self.view.transform().m11()
         self._page_num = page_num
         self._render_current()
         self._fit_in_view()
+        # Restore user zoom if it was changed from default fit
+        fit_zoom = self.view.transform().m11()
+        if abs(saved_zoom - fit_zoom) > 0.01:
+            self.set_zoom(saved_zoom)
         self._reset_idle_timer()
         self.page_changed.emit(self._page_num)
 
