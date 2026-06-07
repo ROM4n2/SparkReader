@@ -74,6 +74,7 @@ class ReaderTab(QWidget):
         self._detect_timer.setInterval(800)  # debounce 800ms
         self._detect_timer.timeout.connect(self._detect_concept)
         self._thread: QThread | None = None
+        self._bg_thread: QThread | None = None
         self._build_ui()
         self._setup_context_menu()
 
@@ -478,14 +479,17 @@ class ReaderTab(QWidget):
         self.status_label.setText(msg)
 
     def _run_in_thread(self, func, arg, callback):
-        # Guard: don't stomp on a running thread
-        if self._thread and self._thread.isRunning():
-            self._thread.quit()
-            self._thread.wait(1000)
-        self._thread = _BackgroundWorker(func, arg)
-        self._thread.finished.connect(callback)
-        self._thread.error.connect(lambda e: self._status_msg(f"⚠️ 操作失败: {e[:80]}"))
-        self._thread.start()
+        # Disconnect old bg thread signals to avoid stale callbacks
+        if self._bg_thread and self._bg_thread.isRunning():
+            try:
+                self._bg_thread.finished.disconnect()
+                self._bg_thread.error.disconnect()
+            except RuntimeError:
+                pass  # nothing connected
+        self._bg_thread = _BackgroundWorker(func, arg)
+        self._bg_thread.finished.connect(callback)
+        self._bg_thread.error.connect(lambda e: self._status_msg(f"⚠️ 操作失败: {e[:80]}"))
+        self._bg_thread.start()
 
     # ── Page navigation helpers ──
 
@@ -823,7 +827,10 @@ class ReaderTab(QWidget):
         return QColor(hex_color)
 
     def close_client(self):
-        """Stop any running thread on close."""
+        """Stop any running threads on close."""
         if self._thread and self._thread.isRunning():
             self._thread.quit()
             self._thread.wait(2000)
+        if self._bg_thread and self._bg_thread.isRunning():
+            self._bg_thread.quit()
+            self._bg_thread.wait(2000)
