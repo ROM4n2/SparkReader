@@ -422,3 +422,29 @@ QMessageBox QLabel {
 QMessageBox QPushButton {
     min-width: 80px;
 }
+
+/* ── Knowledge Graph Panel ── */
+
+.kg-search-box {
+    padding: 8px 12px;
+    font-size: 13px;
+    background: #1a1a2a;
+    border: none;
+    border-bottom: 1px solid #2a2a3e;
+    color: #e0e0e6;
+}
+
+/* ── Summary output ── */
+
+.summary-output {
+    color: #cdd6f4;
+    font-size: 14px;
+    line-height: 1.8;
+    padding: 12px;
+}
+
+.summary-output h3 {
+    color: #c0392b;
+    font-size: 15px;
+    margin-top: 12px;
+}

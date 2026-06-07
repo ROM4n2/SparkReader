@@ -10,7 +10,8 @@ sys.path.insert(0, _PROJ_ROOT)                                    # project root
 sys.path.insert(0, os.path.join(_PROJ_ROOT, "backend"))           # backend/ for config imports
 
 from datetime import datetime
-from PySide6.QtCore import Qt, QTimer, QThread
+from backend import knowledge_db
+from PySide6.QtCore import Qt, QTimer, QThread, Signal
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout,
     QListWidget, QListWidgetItem, QTextBrowser,
@@ -25,6 +26,8 @@ from backend.config import DIRECT_QA_TEMPLATE, CONTEXT_QA_TEMPLATE
 
 class ChatTab(QWidget):
     """Interactive Q&A with conversation management."""
+
+    concept_clicked = Signal(str)  # emitted when user clicks a concept link
 
     MODES = [
         ("rag", "📚 RAG 问答"),
@@ -107,6 +110,7 @@ class ChatTab(QWidget):
         # Message area
         self.msg_browser = QTextBrowser()
         self.msg_browser.setOpenExternalLinks(True)
+        self.msg_browser.anchorClicked.connect(self._on_anchor_clicked)
         right_layout.addWidget(self.msg_browser, 1)
 
         # Input bar
@@ -276,6 +280,13 @@ class ChatTab(QWidget):
             if reply == QMessageBox.StandardButton.Yes:
                 db.delete_conversation(conv_id)
                 self._load_conversation_list()
+
+    def _on_anchor_clicked(self, url):
+        """Handle clicks on concept links in chat messages."""
+        link = url.toString()
+        if link.startswith("kg:"):
+            concept_name = link[3:]
+            self.concept_clicked.emit(concept_name)
 
     # ── Sending messages ──
 
